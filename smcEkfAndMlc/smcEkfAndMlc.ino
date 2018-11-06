@@ -162,15 +162,32 @@ void loop() {
       //Serial.println("Input = 1");
     } 
     else if (input == "2") {
-      // Sliding mode control with varying beta
+      // Sliding mode control with constant beta
       setOut = 2;
       //Serial.println("Input = 2");
     } 
     else if (input == "3") {
-      // Machine learning control
+      // Sliding mode control with varying beta
       setOut = 3;
-      i = 0;
       //Serial.println("Input = 3");
+    } 
+    else if (input == "4") {
+      // Machine learning control
+      setOut = 4;
+      i = 0;
+      //Serial.println("Input = 4");
+    } 
+    else if (input == "5") {
+      // Cart Mass and Friction Estimation
+      setOut = 5;
+      time_now = micros();
+      //Serial.println("Input = 5");
+    } 
+    else if (input == "6") {
+      // Pendulum (1 and 2) Friction Estimation
+      setOut = 6;
+      time_now = micros();
+      //Serial.println("Input = 6");
     } 
     else if (input == "r") {
       // Reset variables
@@ -217,12 +234,6 @@ void loop() {
   
   unsigned long time_stamp = micros();
   
-  //angle and velocity reading from second pendulum
-  Serial.print("pendul 2: ");
-  Serial.print(posPend2,2);   //position is 
-  Serial.print("  ");
-  Serial.println(velPend2,2);
-
   ////////////////////////////////////////////
   // Apply control
   ////////////////////////////////////////////
@@ -253,6 +264,8 @@ void loop() {
    float B_v_p = 0.0004;
    float F_c_p = 0.004;
    float k_tanh = 250;*/
+
+///////////CONTROL CODE/////////////////////////////////////////////
 
   // stop all
   if (setOut == 0) {
@@ -297,16 +310,21 @@ void loop() {
 //    Serial.print(",");
 
 
-//    Serial.print("EKF, ");
-//    Serial.print("t: ");
-//    Serial.print(x_est_correction[1], 2);
-//    Serial.print("  x: ");
-//    Serial.print(x_est_correction[0], 2);
-//    Serial.print("  td: ");
-//    Serial.print(x_est_correction[3], 2);
-//    Serial.print("  xd: ");
-//    Serial.print(x_est_correction[2], 2);
-
+    Serial.print("EKF, ");
+    Serial.print("t: ");
+    Serial.print(x_est_correction[1], 2);
+    Serial.print("  x: ");
+    Serial.print(x_est_correction[0], 2);
+    Serial.print("  td: ");
+    Serial.print(x_est_correction[3], 2);
+    Serial.print("  xd: ");
+    Serial.print(x_est_correction[2], 2);
+  
+//  //angle and velocity reading from second pendulum
+//  Serial.print("pendul 2: ");
+//  Serial.print(posPend2,2);   //position is 
+//  Serial.print("  ");
+//  Serial.println(velPend2,2);
 
     // ---------------Model parameters------------------------//
     float r_pulley = 0.028;
@@ -323,7 +341,7 @@ void loop() {
     float B_v_p = 0.0004;
     float F_c_p = 0.004;
     float k_tanh = 250;
-
+    
     // ------------------sliding mode parameters-----------------//
     float sat = 0;
 
@@ -355,7 +373,7 @@ void loop() {
     float x3 = x_est_correction[3];
     float x4 = x_est_correction[2];
     
-    //if (posPend1 < stop_angle && posPend1 > -stop_angle)
+    ///////CATCH//////////////////////////////////////////////////////////////
     if( ( abs(posPend1) < catchAngle ) || ( abs(posPend1) > 2*PI-catchAngle ) )
     {
       catchAngle = 0.14;
@@ -416,10 +434,10 @@ void loop() {
       // Sliding mode end
 
     } 
-    else// if (0)
+    /////////SWING-UP////////////////////////////////////////////////////////
+    else //if(0)
     {
       Serial.println("\nswing");
-      //energy control - swing-up
       
       float t_delta = (time_stamp-t_last)/1000000;
       
@@ -502,6 +520,7 @@ void loop() {
       setOutSled = 0;
     }
   }
+  ////////PREVIOUS GROUPS///////////////////////////////////////////////////
   else if (setOut == 2) {
 
     if (posSled > cart_ref - start_pos && posSled < cart_ref + start_pos && posPend1 > -start_angle && posPend1 < start_angle) { // Check angle, 0.2 rad = 11.5
@@ -815,7 +834,79 @@ void loop() {
       }
     }
   }
-
+  ////CART FRICTION AND MASS ESTIMATION////
+  else if( setOut == 5 )
+  {
+    digitalWrite(ENABLESLED, HIGH);
+    setOutPend1 = 0;
+    
+    float tSec = float (time_stamp-time_now)/1000000;
+    
+    int   testTime   = 20;
+    float railOffset = 0.6;
+    float railRange  = 0.05;
+       
+    if( posSled < railRange+railOffset && setOutSled >= 0 )
+    {
+      setOutSled = 4;
+    }
+    else if( posSled > 0.02+railOffset && tSec < testTime )
+    {
+      setOutSled = -4;
+    }
+    else if( posSled < 0.02+railOffset && tSec < testTime )
+    {
+      setOutSled = 0;
+    }
+    else if( tSec > testTime )
+    {
+      setOutSled = 0;
+      digitalWrite(ENABLESLED, LOW);
+      if( velSled == 0 )
+      {
+        setOut = 0;
+      }
+    }
+    
+    int deci = 5;
+    Serial.print( tSec,       deci );
+    Serial.print( ", "             );
+    Serial.print( setOutSled, deci );
+    Serial.print( ", "             );
+    Serial.print( posSled,    deci );
+    Serial.print( ", "             );
+    Serial.print( velSled,    deci );
+    Serial.print( "\n"             );
+  }
+  ////PENDULUM FRICTION ESTIMATION////
+  else if( setOut == 6 )
+  {
+    float tSec = float (time_stamp-time_now)/1000000;
+    
+    int deci      = 5;
+    int pend1test = 0;
+    int pend2test = 1;
+    
+    if( pend1test && posPend1 > 0.01 )
+    {
+      Serial.print( tSec,     deci );
+      Serial.print( ", "           );
+      Serial.print( posPend1, deci );
+      Serial.print( ", "           );
+      Serial.print( velPend1, deci );
+      Serial.print( "\n"           );
+    }
+    else if( pend2test && posPend2 > 0.01 )
+    {
+      Serial.print( tSec,     deci );
+      Serial.print( ", "           );
+      Serial.print( posPend2, deci );
+      Serial.print( ", "           );
+      Serial.print( velPend2, deci );
+      Serial.print( "\n"           );
+    }
+  }
+   
   ////////////////////////////////////////////
   // Set outputs
   ////////////////////////////////////////////
@@ -827,7 +918,7 @@ void loop() {
 //  Serial.print(",");
 //  Serial.print(posPend1, 5);
 //  Serial.print(",");
-  Serial.println(time_stamp, DEC);
+//  Serial.println(time_stamp, DEC);
 //  Serial.print(",");
 //  Serial.print(setOutSledNoComp, 5); // setOutSledNoComp control without compensation
 //  Serial.print(",");
