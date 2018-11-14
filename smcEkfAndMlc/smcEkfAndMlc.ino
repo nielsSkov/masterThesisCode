@@ -153,12 +153,16 @@ void loop() {
       P_correction_EKF_not_empty_init(); // Reset EKF
       wait_for_position = false; // Reset control such that it waits for the correct position
       cart_ref_goal = init_ref;
+      Serial.print("\n");
+      Serial.print("stopLogging");      
       //Serial.println("Input = 0");
     } 
     else if (input == "1") {
       // Sliding mode control with constant beta
       setOut = 1;
       time_now = micros();
+      Serial.print("\n");
+      Serial.print("startLogging");      
       //Serial.println("Input = 1");
     } 
     else if (input == "2") {
@@ -233,7 +237,7 @@ void loop() {
   velPend2 = -pend2.readVel(); //<--| 2nd pendulum
   
   unsigned long time_stamp = micros();
- 
+
   Serial.print("\n");
   if( setOut != 1 )
   {
