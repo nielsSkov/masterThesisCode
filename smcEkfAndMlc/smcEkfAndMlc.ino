@@ -233,7 +233,19 @@ void loop() {
   velPend2 = -pend2.readVel(); //<--| 2nd pendulum
   
   unsigned long time_stamp = micros();
-  
+ 
+  Serial.print("\n");
+  if( setOut != 1 )
+  {
+    Serial.print(posPend1 ,2);
+    Serial.print(", ");
+    Serial.print(posSled  ,2);
+    Serial.print(", ");
+    Serial.print(velPend1 ,2);
+    Serial.print(", ");
+    Serial.print(velSled  ,2);
+  } 
+
   ////////////////////////////////////////////
   // Apply control
   ////////////////////////////////////////////
@@ -308,18 +320,7 @@ void loop() {
 //    Serial.print(",");
 //    Serial.print(x_est_correction[3], 5);
 //    Serial.print(",");
-
-
-    Serial.print("EKF, ");
-    Serial.print("t: ");
-    Serial.print(x_est_correction[1], 2);
-    Serial.print("  x: ");
-    Serial.print(x_est_correction[0], 2);
-    Serial.print("  td: ");
-    Serial.print(x_est_correction[3], 2);
-    Serial.print("  xd: ");
-    Serial.print(x_est_correction[2], 2);
-  
+ 
 //  //angle and velocity reading from second pendulum
 //  Serial.print("pendul 2: ");
 //  Serial.print(posPend2,2);   //position is 
@@ -345,11 +346,11 @@ void loop() {
     // ------------------sliding mode parameters-----------------//
     float sat = 0;
 
-    float k_s[] = { -32.4593  , -4.8069 , 31.9492   };
+    float k_s[] = { 7.3918 ,  -1.3414 ,  -5.5344 };
 
     float k1 = k_s[0], k2 = k_s[1], k3 = k_s[2];
 
-    float rho     = 9;//28;
+    float rho     = 6.2;//7.135;
     float beta_0  = .1;
     float beta    = rho + beta_0;
     float epsilon = 0.03;
@@ -369,14 +370,25 @@ void loop() {
     
     //  CHANGE OF COOREDINATE CONVENSION
     float x1 = x_est_correction[1];
-    float x2 = x_est_correction[0];
+    float x2 = x_est_correction[0]-0.38;
     float x3 = x_est_correction[3];
     float x4 = x_est_correction[2];
+   
+    Serial.print(x1, 2);
+    Serial.print(", ");
+    Serial.print(x2, 2);
+    Serial.print(", ");
+    Serial.print(x3, 2);
+    Serial.print(", ");
+    Serial.print(x4, 2);
     
     ///////CATCH//////////////////////////////////////////////////////////////
     if( ( abs(posPend1) < catchAngle ) || ( abs(posPend1) > 2*PI-catchAngle ) )
     {
-      catchAngle = 0.14;
+      // Sliding mode start
+      Serial.println("\n\nslide");
+      
+      catchAngle = 0.2;
       
       //change angle reff if approaching on far side
       if( abs(x1) > 2*PI-catchAngle )
@@ -388,13 +400,10 @@ void loop() {
       {
         x1_old = 0;
       }
+
+      float g_b_inv = m_c + m_b - m_b*cos(x1)*cos(x1);
+      float s       = x4 - k2*(x3 - (x4*cos(x1))/l) + k1*x1 + k3*x2;
       
-      // Sliding mode start
-      Serial.println("\nslide");
-
-      float g_b_inv = (l*(m_c + m_b - m_b*cos(x1)*cos(x1)))/cos(x1);
-      float s       =  x3 + k1*x2 + k3*x1 - k2*(x3 - (2000*x4*cos(x1))/647);
-
       float z = s / epsilon;
       if (z > 1)
       {
@@ -409,7 +418,11 @@ void loop() {
         sat = z;
       }
 
-      float u = - g_b_inv*beta*sat;
+      float k_lin[] = { 10.5460 , 15.8190 };
+
+      float lin_u = float( -k_lin[1]*x2 -k_lin[1]*x4 );
+      
+      float u = - sat*beta*g_b_inv + lin_u;
       
       setOutSled = u*r_pulley/K_t;
 
@@ -437,8 +450,10 @@ void loop() {
     /////////SWING-UP////////////////////////////////////////////////////////
     else //if(0)
     {
-      Serial.println("\nswing");
+      Serial.println("\n\nswing");
       
+      catchAngle = 0.01;
+
       float t_delta = (time_stamp-t_last)/1000000;
       
       x1 = posPend1;
@@ -464,7 +479,7 @@ void loop() {
       float u_max = i_max*K_t/r_pulley;
       float a_max = u_max/(m_c+m_b) -.1;
       
-      float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1) - 1) -.016;
+      float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1) - 1) -.02;// -.016;
       
       float a_c = -k*E_delta*sgn;
       
@@ -491,20 +506,6 @@ void loop() {
       
       x1_last = x1;
       t_last  = time_stamp;
-      
-      Serial.print("t: ");
-      Serial.print(x1, 2);
-      Serial.print("  x: ");
-      Serial.print(x2, 2);
-      Serial.print("  td: ");
-      Serial.print(x3, 2);
-      Serial.print("  xd: ");
-      Serial.print(x4, 2);
-      Serial.print("  u: ");
-      Serial.print(u, 2);
-      Serial.print("  sgn: ");
-      Serial.print(sgn, 2);
-      Serial.print("  ");
       
     }
     
