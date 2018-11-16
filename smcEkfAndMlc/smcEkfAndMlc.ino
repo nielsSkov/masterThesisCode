@@ -59,6 +59,8 @@ unsigned long last_time = 0;
 unsigned long  loop_time = 0;
 unsigned long time_now = 0;
 
+int logSwitch = 0;
+
 float I_error = 0;
 
 // For initializing the EKF
@@ -153,8 +155,6 @@ void loop() {
       P_correction_EKF_not_empty_init(); // Reset EKF
       wait_for_position = false; // Reset control such that it waits for the correct position
       cart_ref_goal = init_ref;
-      Serial.print("\n");
-      Serial.print("stopLogging");      
       //Serial.println("Input = 0");
     } 
     else if (input == "1") {
@@ -185,12 +185,14 @@ void loop() {
       // Cart Mass and Friction Estimation
       setOut = 5;
       time_now = micros();
+      Serial.print("startLogging");
       //Serial.println("Input = 5");
     } 
     else if (input == "6") {
       // Pendulum (1 and 2) Friction Estimation
       setOut = 6;
       time_now = micros();
+      Serial.print("startLogging");
       //Serial.println("Input = 6");
     } 
     else if (input == "r") {
@@ -239,15 +241,25 @@ void loop() {
   unsigned long time_stamp = micros();
 
   Serial.print("\n");
-  if( setOut != 1 )
+  if( setOut == 0 )
   {
-    Serial.print(posPend1 ,2);
-    Serial.print(", ");
-    Serial.print(posSled  ,2);
-    Serial.print(", ");
-    Serial.print(velPend1 ,2);
-    Serial.print(", ");
-    Serial.print(velSled  ,2);
+    if( logSwitch == 1 )
+    {
+      Serial.println("stopLogging");
+      logSwitch = 0;
+    }
+
+    float tSec = float(float(time_stamp)/1000000);  // [s]
+    
+    Serial.print( tSec       ,2 );
+    Serial.print( ", "          );
+    Serial.print( posPend1   ,2 );
+    Serial.print( ", "          );
+    Serial.print( posSled    ,2 );
+    Serial.print( ", "          );
+    Serial.print( velPend1   ,2 );
+    Serial.print( ", "          );
+    Serial.print( velSled    ,2 );
   } 
 
   ////////////////////////////////////////////
@@ -302,7 +314,7 @@ void loop() {
     y_meas[0] = posSled;
     y_meas[1] = posPend1; // Has to be in radians
 
-    if (first_run)
+    if( first_run )
     {
       x_init[0] = posSled;
       x_init[1] = posPend1; // Has to be in radians
@@ -390,7 +402,7 @@ void loop() {
     if( ( abs(posPend1) < catchAngle ) || ( abs(posPend1) > 2*PI-catchAngle ) )
     {
       // Sliding mode start
-      Serial.println("\n\nslide");
+      //Serial.println("\n\nslide");
       
       catchAngle = 0.2;
       
@@ -426,7 +438,7 @@ void loop() {
 
       float lin_u = float( -k_lin[1]*x2 -k_lin[1]*x4 );
       
-      float u = - sat*beta*g_b_inv + lin_u;
+      float u = - sat*beta*g_b_inv;// + lin_u;
       
       setOutSled = u*r_pulley/K_t;
 
@@ -454,7 +466,7 @@ void loop() {
     /////////SWING-UP////////////////////////////////////////////////////////
     else //if(0)
     {
-      Serial.println("\n\nswing");
+      //Serial.println("\n\nswing");
       
       catchAngle = 0.01;
 
@@ -839,29 +851,39 @@ void loop() {
       }
     }
   }
+  /////////////////////////////////////////
   ////CART FRICTION AND MASS ESTIMATION////
+  /////////////////////////////////////////
   else if( setOut == 5 )
   {
     digitalWrite(ENABLESLED, HIGH);
     setOutPend1 = 0;
     
-    float tSec = float (time_stamp-time_now)/1000000;
+    float tSec = float(float(time_stamp-time_now)/1000000);  // [s]
     
-    int   testTime   = 20;
-    float railOffset = 0.6;
-    float railRange  = 0.05;
-       
-    if( posSled < railRange+railOffset && setOutSled >= 0 )
+    int   testTime   = 20;    // [s]
+    float railOffset = 0.60;  //<--position on rail under test [m]
+    float railRange  = 0.002; //<--range margin [m] of movement 
+                              //   on each side of railOffset
+    //Note:
+    //security end-stop activates
+    //  @ 0.04 m and below
+    //  @ 0.73 m and above
+    
+    //rail offsets (from left side of rail) under test:
+    //  0.05, 0.06, ..., 0.72  (total of 68 tests)
+
+    if( posSled < railOffset+railRange && setOutSled >= 0 )
     {
       setOutSled = 4;
     }
-    else if( posSled > 0.02+railOffset && tSec < testTime )
+    else if( posSled > railOffset-railRange && tSec < testTime )
     {
       setOutSled = -4;
     }
-    else if( posSled < 0.02+railOffset && tSec < testTime )
+    else if( tSec < testTime )
     {
-      setOutSled = 0;
+      setOutSled = 4;
     }
     else if( tSec > testTime )
     {
@@ -869,8 +891,9 @@ void loop() {
       digitalWrite(ENABLESLED, LOW);
       if( velSled == 0 )
       {
-        setOut = 0;
-      }
+        logSwitch = 1; //when time is up and the cart is
+        setOut    = 0; //no longer moving, return to complete stop,
+      }                //where logging is also stoped
     }
     
     int deci = 5;
@@ -881,9 +904,10 @@ void loop() {
     Serial.print( posSled,    deci );
     Serial.print( ", "             );
     Serial.print( velSled,    deci );
-    Serial.print( "\n"             );
   }
+  ////////////////////////////////////
   ////PENDULUM FRICTION ESTIMATION////
+  ////////////////////////////////////
   else if( setOut == 6 )
   {
     float tSec = float (time_stamp-time_now)/1000000;

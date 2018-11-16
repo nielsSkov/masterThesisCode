@@ -5,6 +5,7 @@ import socket
 import subprocess
 import time
 import serial
+from pathlib import Path
 
 def serialInSocketOutAndLog():
     log = 0
@@ -26,17 +27,20 @@ def serialInSocketOutAndLog():
         
         if newState and log:
            logFile = open(logPathToFile,'a')
-        #elif newState and not log:
-        #   logFile.close()
+        elif newState and not log:
+           logFile.close()
 
-        if log == 1:
-           logFile.write(serReadUtf8)
+        if log and not newState:
+            logFile.write(serReadUtf8)
 
 def testNameSelect():
     global testName
     global logPathToFile
-    testName = input("Name of test for log filename: ")
-    logPathToFile = '/home/niels/'+testName+'.csv'
+
+    testName      = input("Name of test for log filename: ")
+    pathFromHome  = '/thesis/matlab/parameterEstimation/swingUpAndCatch/'
+    home          = str(Path.home())
+    logPathToFile = home+pathFromHome+testName+'.csv'
 
 def serialOut():
     while True:
@@ -47,10 +51,11 @@ def serialOut():
             ser.write(bytes(usrInput))
 
 def listen():
-    monitorshell = subprocess.Popen("termite --exec=\"nc -l -p 8001\"",shell=True)
+    listenTermCmd = "termite --exec=\"nc -l -p 8001\""
+    monitorshell  = subprocess.Popen( listenTermCmd, shell = True )
 
 
-#clear terminal
+#clear terminal (same result as 'clear')
 print("\033[H\033[J")
 
 ser = serial.Serial('/dev/ttyACM0', 115200)
