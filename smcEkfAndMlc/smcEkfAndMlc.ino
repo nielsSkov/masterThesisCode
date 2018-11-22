@@ -41,10 +41,17 @@ int   setOut      = 0;
 
 float t_last      = 0;
 float x1_last     = 0;
+float x2_last     = 0;
 float u_last      = 0;
 float x1_old      = 0;
-float catchAngle  = 0.01;
+float catchAngle  = 0.02;
 int   logSwitch   = 0;
+
+//ring-buffer and offset for FIR filter
+int   offsetFIR      = 0;
+//int   offsetFIR2     = 0;
+float ringBuffFIR[]  = { 0, 0, 0, 0, 0};//, 0, 0, 0, 0, 0 };//, 0, 0, 0, 0, 0, 0 };
+//float ringBuffFIR2[] = { 0, 0, 0, 0, 0};//, 0, 0, 0, 0, 0 };//, 0, 0, 0, 0, 0, 0 };
 
 unsigned long current_time = 0;
 unsigned long last_time    = 0;
@@ -128,7 +135,6 @@ void setup()
 
   current_time = micros();
   EKF_initialize();
-  run_mlc_initialize();
 }
 
 void loop()
@@ -153,9 +159,9 @@ void loop()
       
       //reset control such that it
       //waits for the correct position
-      wait_for_position = false;
+      //wait_for_position = false;
 
-      cart_ref_goal     = init_ref;
+      //cart_ref_goal     = init_ref;
     }
     ///////Swing-Up and Sliding Mode///////////////////////
     else if( input == "1" )
@@ -191,17 +197,17 @@ void loop()
       
       //reset control such that it
       //waits for the correct position
-      wait_for_position = false;
+      //wait_for_position = false;
       
-      cart_ref          = init_ref;
-      cart_ref_goal     = init_ref;
+      //cart_ref          = init_ref;
+      //cart_ref_goal     = init_ref;
       
       Serial.println("\nInput = r");
     } 
     ///////Input Error/////////////////////////////////////
     else
     {
-      Serial.println("ERROR: Unknown Command!");
+      Serial.println("\nERROR: Unknown Command!");
     }
     //<<
   } //<<<<SERIAL INTERFACE <END<
@@ -219,7 +225,7 @@ void loop()
   
   unsigned long time_stamp = micros();
 
-  ///////PRINT FOR OPPERATOR AND 'LOG STOP'////////////////
+  ///////'LOG STOP' AND PRINT FOR OPPERATOR////////////////
   Serial.print("\n");
   if( setOut == 0 )
   {
@@ -236,7 +242,7 @@ void loop()
     float tSec = float(float(time_stamp)/1000000);  // [s]
     
     //print states for operator (system not controlled)
-    int deci = 2;
+    int deci = 5;
     Serial.print( tSec,     deci );
     Serial.print( ", "           );
     Serial.print( posPend1, deci );
@@ -249,21 +255,21 @@ void loop()
   } 
 
   ///////CART REFFERENCE///////////////////////////////////
-  if( fabs(cart_ref_goal - cart_ref) > 0.001 )
-  {
-    if( (cart_ref_goal - cart_ref) > 0 )
-    {
-      cart_ref += 0.1 / 150;
-    } 
-    else
-    {
-      cart_ref -= 0.1 / 150;
-    }
-  } 
-  else
-  {
-    cart_ref = cart_ref_goal;
-  }
+//  if( fabs(cart_ref_goal - cart_ref) > 0.001 )
+//  {
+//    if( (cart_ref_goal - cart_ref) > 0 )
+//    {
+//      cart_ref += 0.1 / 150;
+//    } 
+//    else
+//    {
+//      cart_ref -= 0.1 / 150;
+//    }
+//  } 
+//  else
+//  {
+//    cart_ref = cart_ref_goal;
+//  }
 
   ///////MODEL PARAMETERS//////////////////////////////////
   float r_pulley = 0.028;
@@ -272,6 +278,79 @@ void loop()
   float B_c_neg  = 2.7464;
 
 
+  /////////////////////////////////////////////////////////
+  ///////FIR FILTER////////////////////////////////////////
+  /////////////////////////////////////////////////////////
+
+  float x1_FIR = posPend1;
+
+  //time difference for nummerical diff
+  float t_delta = float(float(time_stamp-t_last)/1000000); // [s]
+  
+  float x3_FIR = (x1_FIR - x1_last)/t_delta;
+
+  //----implementation of FIR filter (with ring buffer)----
+
+  //set window size
+  float  M_FIR = 5;
+  //filter coefficients
+  float h[]  = { 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR};//, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR};//, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR };
+
+  //update new mesurement in ring-buffer
+  ringBuffFIR[offsetFIR] = x3_FIR;
+  
+  //initializing variable to be updated with filtered value
+  x3_FIR = 0;
+
+  //loop through ring-buffer applying filter
+  for( int j = offsetFIR; j < M_FIR+offsetFIR; j++ )
+  {
+    int ringDex = j % int(M_FIR);
+
+    x3_FIR += ringBuffFIR[ringDex]*h[ringDex];
+  }
+  
+  //move ring-buffer offset one step
+  if( offsetFIR++ == M_FIR-1 ){ offsetFIR = 0; }
+  //NOTE: it checks first then increments
+
+//  //-----------------position FIR---------------------------
+//
+//    float x2 = posSled-0.38; //<--rail center as zero
+//
+//    float x4 = (x2 - x2_last)/t_delta;
+//    Serial.print( x4,   5 );
+//    Serial.print( ", "    );
+//
+//    //----implementation of FIR filter (with ring buffer)----
+//
+//    //set window size
+//    //M_FIR = 16;
+//    //filter coefficients
+//    //float h[]  = { 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR };
+//
+//    //update new mesurement in ring-buffer
+//    ringBuffFIR2[offsetFIR2] = x4;
+//    
+//    //initializing variable to be updated with filtered value
+//    x4 = 0;
+//
+//    //loop through ring-buffer applying filter
+//    for( int j = offsetFIR2; j < M_FIR+offsetFIR2; j++ )
+//    {
+//      int ringDex2 = j % int(M_FIR);
+//
+//      x4 += ringBuffFIR2[ringDex2]*h[ringDex2];
+//    }
+//    
+//    //move ring-buffer offset one step
+//    if( offsetFIR2++ == M_FIR-1 ){ offsetFIR2 = 0; }
+//    //NOTE: it checks first then increments
+
+    x1_last = x1_FIR;
+    //x2_last = x2;
+    t_last  = time_stamp;
+ 
   /////////////////////////////////////////////////////////
   ///////STOP ALL//////////////////////////////////////////
   /////////////////////////////////////////////////////////
@@ -353,6 +432,19 @@ void loop()
     float x3 = x_est_correction[3];
     float x4 = x_est_correction[2];
     
+    //creating wrapped vertion of angle for sliding mode
+    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+    if( x1Wrap < 0 )
+    {
+      x1Wrap = float(x1Wrap + float(2*PI));
+    }
+    x1Wrap = float(x1Wrap - PI);
+    x1 = x1Wrap;
+    
+    //time converted from micro sec to sec
+    float tSec = float(float(time_stamp)/1000000);  // [s] 
+    
+
     //set friction based on velocity direction
     if( (x4 > 0) || ((x4 == 0) && (setOutSled > 0)) )
     {
@@ -362,43 +454,30 @@ void loop()
     {
       B_v_c = B_v_neg;
     }
-   
-    Serial.print(x1, 2);
-    Serial.print(", ");
-    Serial.print(x2, 2);
-    Serial.print(", ");
-    Serial.print(x3, 2);
-    Serial.print(", ");
-    Serial.print(x4, 2);
+ 
+    //printing for data collection
+    float deci = 5; 
+    Serial.print( tSec,   deci );
+    Serial.print( ", "         );
+    Serial.print( x1,     deci );
+    Serial.print( ", "         );
+    Serial.print( x2,     deci );
+    Serial.print( ", "         );
+    Serial.print( x3,     deci );
+    Serial.print( ", "         );
+    Serial.print( x4,     deci );
+    Serial.print( ", "         );
+    Serial.print( x3_FIR, deci );
 
     /////////////////////////////////////////////////////////
     ///////CATCH - SLIDING MODE//////////////////////////////
     /////////////////////////////////////////////////////////
     //
-    if( ( abs(posPend1) < catchAngle ) || ( abs(posPend1) > 2*PI-catchAngle ) )
+    if(  abs(x1Wrap) < catchAngle  )
     {
       //set wider catch angle to stay in sliding mode after wing-up sequence 
       catchAngle = 0.2;
       
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //!!!!!!!MAKE THIS WORK FOR N*2*PI BY USING MODULO!!!!!!!!!!!!!!!!
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //
-      //change angle reff if approaching on far side  <---not just!!!!!!
-      //
-      if( abs(x1) > 2*PI-catchAngle )
-      {
-        x1_old = x1;
-        x1 = x1-2*PI;
-      }
-      else
-      {
-        x1_old = 0;
-      }
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
       //inverse of function on output
       float g_b_inv = m_c + m_b - m_b*cos(x1)*cos(x1);
       
@@ -436,7 +515,7 @@ void loop()
       if(0)
       {
         float i_peak_limit = 6;
-        if( abs(setOutSled) > i_peak_limit  )
+        if( abs(setOutSled) > i_peak_limit )
         {
           if( setOutSled > 0 )
           {
@@ -447,13 +526,6 @@ void loop()
             setOutSled = -i_peak_limit;
           }
         }
-      }
-      
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!?
-      //restore true angle !!!!!!!!!! <--is this still neccessarry!!?
-      if( x1_old )
-      {
-        x1 = x1_old;
       }
       //<<
     } //<<<<CATCH - SLIDING MODE <END<
@@ -466,23 +538,12 @@ void loop()
       //set narrow catch angle to provide
       //best handover to sliding mode
       catchAngle = 0.01;
-
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //time difference for nummerical diff
-      float t_delta = (time_stamp-t_last)/1000000; // [s]
-      
-      //states used in swing-up reassigned for readability
-      x1 = posPend1;
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      //nummerical diff!!!!!!!!! <--IMPLEMENT FIR-FILTER!!!!!!
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      x3 = (x1 - x1_last)/t_delta;
       
       //energy control gain
-      float k = 110; //200;
+      float k = 110+90; //200;
 
       //sign-function
-      float sgnIn = cos(x1)*x3;
+      float sgnIn = cos(x1_FIR)*x3_FIR;
       float sgn   = 1;
       //
       if( sgnIn >= 0 )
@@ -495,15 +556,15 @@ void loop()
       }
       
       //calculate maximum acceleration of cart
-      float i_max = 4.58;
+      float i_max = 4.58+1;
       float u_max = i_max*K_t/r_pulley;
-      float a_max = u_max/(m_c+m_b) -.1;
+      float a_max = u_max/(m_c+m_b);
       
       //extra energy offset from equilibrium to get fast catch
-      float E_off = -.02; // -.016;
+      float E_off = -.02-.01; // -.016;
       
       //energy error
-      float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1) - 1) + E_off;
+      float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1_FIR) - 1) + E_off;
       
       //energy control law (acceleration of cart)
       float a_c = -k*E_delta*sgn;
@@ -518,7 +579,7 @@ void loop()
       }
       
       //estimation of needed actuation to achieve cart acceleration, a_c
-      float theta_acc_est = ( m_c + m_b )*( -B_v_p*x3 -tanh(k_tanh*x3)*F_c_p + m_b*g*l*sin(x1) )/( l*l*m_b*(m_c + m_b - m_b*cos(x1)*cos(x1)) ) + ( cos(x1)*(u_last - m_b*l*sin(x1)*x3*x3) )/( l*(m_c + m_b - m_b*cos(x1)*cos(x1)) );
+      float theta_acc_est = ( m_c + m_b )*( -B_v_p*x3_FIR -tanh(k_tanh*x3_FIR)*F_c_p + m_b*g*l*sin(x1_FIR) )/( l*l*m_b*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) ) + ( cos(x1_FIR)*(u_last - m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR) )/( l*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) );
       
       //gain for x-control
       float k_lin[] = { 10.5460 , 15.8190 };
@@ -527,7 +588,7 @@ void loop()
       float lin_u =  -k_lin[1]*x2 -k_lin[1]*x4;
       
       //final control out put, energy control with position control
-      u = ( m_c + m_b )*a_c + m_b*l*sin(x1)*x3*x3 -m_b*l*cos(x1)*theta_acc_est + lin_u;
+      u = ( m_c + m_b )*a_c + m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR -m_b*l*cos(x1_FIR)*theta_acc_est + lin_u;
       
       //calculated needed armature current, i_a, to achieve control, u
       setOutSled = u*r_pulley/K_t;
@@ -535,15 +596,12 @@ void loop()
       //store final control for estimation of theta_acc in next loop
       u_last = u;
       
-      //for numerical diff <-- are they still needed? 
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      x1_last = x1;
-      t_last  = time_stamp;
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    }
+      //<<
+    } //<<<<SWING-UP <END<
+      //<<
     
     //reduced notation for friction compensation
-    float x4 = x_est_correction[2];
+    //x4 = x_est_correction[2];
     
     //friction compensation
     setOutSledNoComp = setOutSled;
@@ -558,10 +616,11 @@ void loop()
     else
     {
       setOutSled = 0;
-    }
+    } 
+    //<< 
+  } //<<<<SWING-UP AND SLIDING MODE <END<
     //<<
-  } //<<<<SWING-UP <END<
-    //<<
+    //
   /////////////////////////////////////////////////////////
   ///////CART FRICTION AND MASS ESTIMATION////////////////
   /////////////////////////////////////////////////////////
