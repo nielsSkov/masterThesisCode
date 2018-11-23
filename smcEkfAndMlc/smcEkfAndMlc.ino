@@ -23,6 +23,48 @@
 #define ENABLEPENDUL 11      // 50
 #define ENABLESLED   12      // 48
 
+///////////////////////////////////////////////////////////
+///////COLOUMB FRICTION LOOKUP/////////////////////////////
+///////////////////////////////////////////////////////////
+
+//cart position lookup
+float position[] =
+  { 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14,
+    0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24,
+    0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34,
+    0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44,
+    0.45, 0.46, 0.47, 0.48, 0.49, 0.50, 0.51, 0.52, 0.53, 0.54,
+    0.55, 0.56, 0.57, 0.58, 0.59, 0.60, 0.61, 0.62, 0.63, 0.64,
+    0.65, 0.66, 0.67, 0.68, 0.69, 0.70, 0.71, 0.72             };
+
+//coloumb friction coefficient 
+//at each position for positive velocity
+float coloumbP[] =
+  { 2.0599, 2.0059, 2.1820, 2.2164, 2.2342, 2.2546, 2.2178, 2.2195,
+    2.4184, 2.4506, 2.7560, 2.8778, 2.8485, 2.8498, 3.0238, 3.2066,
+    3.1093, 3.1399, 2.8875, 2.7890, 2.6054, 1.9920, 1.9811, 1.9713,
+    1.9721, 1.9877, 2.1605, 2.2211, 2.2249, 2.1049, 2.3816, 2.4523,
+    2.6783, 2.4560, 2.9049, 2.9076, 3.1950, 3.2866, 3.1905, 3.2095,
+    3.2441, 3.1898, 2.6971, 2.8141, 2.4427, 2.2702, 2.1833, 2.2546,
+    2.2863, 2.6159, 2.5990, 2.6953, 2.8589, 3.3110, 3.2057, 3.5125,
+    3.2856, 3.3000, 2.9808, 2.9562, 3.0018, 2.7540, 2.7749, 2.7897,
+    3.0878, 2.8514, 2.9757, 3.0784                                 };
+
+//coloumb friction coefficient 
+//at each position for negative velocity
+float coloumbN[] =
+  { 5.6263, 5.6912, 5.0210, 4.7789, 4.5369, 4.5226, 4.3667, 3.6637,
+    3.3560, 3.3377, 2.9555, 2.8196, 2.6894, 2.6508, 2.7522, 2.7978,
+    3.1890, 2.9839, 3.2756, 3.5558, 3.5269, 4.3655, 4.5228, 4.4821,
+    4.2200, 4.0933, 3.4397, 3.3830, 3.0173, 3.0530, 2.8399, 2.5662,
+    2.3793, 2.6272, 1.9711, 2.0432, 1.8917, 1.6675, 1.9137, 1.8585,
+    1.9262, 2.4228, 2.2988, 2.6986, 2.7103, 2.9014, 2.9634, 2.7753,
+    2.7122, 2.4782, 2.5381, 2.0629, 2.1222, 2.3033, 2.3858, 2.7245,
+    2.2818, 2.5743, 2.4700, 2.5944, 2.8320, 2.8006, 2.7077, 2.7269,
+    2.5346, 2.8446, 2.7306, 2.5191                                 };
+
+///////////////////////////////////////////////////////////
+
 // Create joint objects
 Joint  sled( 1, SAMPLINGTIME );
 Joint pend1( 2, SAMPLINGTIME );
@@ -49,9 +91,9 @@ int   logSwitch   = 0;
 
 //ring-buffer and offset for FIR filter
 int   offsetFIR      = 0;
-//int   offsetFIR2     = 0;
+int   offsetFIR2     = 0;
 float ringBuffFIR[]  = { 0, 0, 0, 0, 0};//, 0, 0, 0, 0, 0 };//, 0, 0, 0, 0, 0, 0 };
-//float ringBuffFIR2[] = { 0, 0, 0, 0, 0};//, 0, 0, 0, 0, 0 };//, 0, 0, 0, 0, 0, 0 };
+float ringBuffFIR2[] = { 0, 0, 0, 0, 0};//, 0, 0, 0, 0, 0 };//, 0, 0, 0, 0, 0, 0 };
 
 unsigned long current_time = 0;
 unsigned long last_time    = 0;
@@ -83,9 +125,9 @@ int i = 0;
 int MLC_loop_count = 0;
 
 
-////////////////////////////////
-///////SYSTEM SETUP/////////////
-////////////////////////////////
+///////////////////////////////////////////////////////////
+///////SYSTEM SETUP////////////////////////////////////////
+///////////////////////////////////////////////////////////
 void setup()
 {
   //Set Baud Rate
@@ -274,8 +316,8 @@ void loop()
   ///////MODEL PARAMETERS//////////////////////////////////
   float r_pulley = 0.028;
   float K_t      = 0.0934;
-  float B_c_pos  = 3.0212 - 0.5;
-  float B_c_neg  = 2.7464;
+  //float B_c_pos  = 3.0212 - 0.5;
+  //float B_c_neg  = 2.7464;
 
 
   /////////////////////////////////////////////////////////
@@ -314,42 +356,35 @@ void loop()
   if( offsetFIR++ == M_FIR-1 ){ offsetFIR = 0; }
   //NOTE: it checks first then increments
 
-//  //-----------------position FIR---------------------------
-//
-//    float x2 = posSled-0.38; //<--rail center as zero
-//
-//    float x4 = (x2 - x2_last)/t_delta;
-//    Serial.print( x4,   5 );
-//    Serial.print( ", "    );
-//
-//    //----implementation of FIR filter (with ring buffer)----
-//
-//    //set window size
-//    //M_FIR = 16;
-//    //filter coefficients
-//    //float h[]  = { 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR };
-//
-//    //update new mesurement in ring-buffer
-//    ringBuffFIR2[offsetFIR2] = x4;
-//    
-//    //initializing variable to be updated with filtered value
-//    x4 = 0;
-//
-//    //loop through ring-buffer applying filter
-//    for( int j = offsetFIR2; j < M_FIR+offsetFIR2; j++ )
-//    {
-//      int ringDex2 = j % int(M_FIR);
-//
-//      x4 += ringBuffFIR2[ringDex2]*h[ringDex2];
-//    }
-//    
-//    //move ring-buffer offset one step
-//    if( offsetFIR2++ == M_FIR-1 ){ offsetFIR2 = 0; }
-//    //NOTE: it checks first then increments
+  //-----------------position FIR---------------------------
 
-    x1_last = x1_FIR;
-    //x2_last = x2;
-    t_last  = time_stamp;
+  float x2_FIR = posSled-0.38; //<--rail center as zero
+
+  float x4_FIR = (x2_FIR - x2_last)/t_delta;
+
+  //----implementation of FIR filter (with ring buffer)----
+
+  //update new mesurement in ring-buffer
+  ringBuffFIR2[offsetFIR2] = x4_FIR;
+  
+  //initializing variable to be updated with filtered value
+  x4_FIR = 0;
+
+  //loop through ring-buffer applying filter
+  for( int j = offsetFIR2; j < M_FIR+offsetFIR2; j++ )
+  {
+    int ringDex2 = j % int(M_FIR);
+
+    x4_FIR += ringBuffFIR2[ringDex2]*h[ringDex2];
+  }
+  
+  //move ring-buffer offset one step
+  if( offsetFIR2++ == M_FIR-1 ){ offsetFIR2 = 0; }
+  //NOTE: it checks first then increments
+
+  x1_last = x1_FIR;
+  x2_last = x2_FIR;
+  t_last  = time_stamp;
  
   /////////////////////////////////////////////////////////
   ///////STOP ALL//////////////////////////////////////////
@@ -386,17 +421,22 @@ void loop()
     //Model Parameters
     float r_pulley = 0.028;
     float K_t      = 0.0934;
-    float B_c_neg  = 2.7464;
-    float B_v_pos  = 1.936;
-    float B_v_neg  = 1.422;
-    float B_v_c    = B_v_pos;
     float l        = 0.3348;      //0.3235;
-    float m_c      = 5.273+1.103;
+    //float m_c      = 5.273+1.103;
     float m_b      = 0.201;
     float g        = 9.81;
+    float k_tanh   = 250;
+
+    //cart frictions
+    //float B_c_neg  = 2.7464;
+    //float B_v_pos  = 1.936;
+    //float B_v_neg  = 1.422;
+    float m_c   =  6.280;
+    float B_v_c = 10.414;
+    
+    //pendulum frictions
     float B_v_p    = 0.0004;
     float F_c_p    = 0.004;
-    float k_tanh   = 250;
     
     //>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<//
     //>>>>>SLIDING MODE PARAMETERS<<<<<<<<<<<<<<<<<<<<<<<<<//
@@ -445,15 +485,31 @@ void loop()
     float tSec = float(float(time_stamp)/1000000);  // [s] 
     
 
-    //set friction based on velocity direction
+
+    ////////DETERMINE COLOUMB FRICTION//////////////////////
+    float B_c_c = 0;    
+
     if( (x4 > 0) || ((x4 == 0) && (setOutSled > 0)) )
     {
-      B_v_c = B_v_pos;
+      B_c_c = interpolateFrictionLookup( position, coloumbP, x2 );
     }
     else if( (x4 < 0) || ((x4 == 0) && (setOutSled < 0)) )
     {
-      B_v_c = B_v_neg;
+      B_c_c = interpolateFrictionLookup( position, coloumbN, x2 );
     }
+    
+    ////////////////////////////////////////////////////////
+
+
+    // set friction based on velocity direction
+    // if( (x4 > 0) || ((x4 == 0) && (setOutSled > 0)) )
+    // {
+    //   B_v_c = B_v_pos;
+    // }
+    // else if( (x4 < 0) || ((x4 == 0) && (setOutSled < 0)) )
+    // {
+    //   B_v_c = B_v_neg;
+    // }
  
     //printing for data collection
     float deci = 5; 
@@ -569,6 +625,7 @@ void loop()
       //energy control law (acceleration of cart)
       float a_c = -k*E_delta*sgn;
       
+      //saturation
       if( a_c > a_max )
       {
         a_c = a_max;
@@ -577,6 +634,7 @@ void loop()
       {
         a_c = -a_max;
       }
+      //a_c = a_c otherwise
       
       //estimation of needed actuation to achieve cart acceleration, a_c
       float theta_acc_est = ( m_c + m_b )*( -B_v_p*x3_FIR -tanh(k_tanh*x3_FIR)*F_c_p + m_b*g*l*sin(x1_FIR) )/( l*l*m_b*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) ) + ( cos(x1_FIR)*(u_last - m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR) )/( l*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) );
@@ -602,21 +660,54 @@ void loop()
     
     //reduced notation for friction compensation
     //x4 = x_est_correction[2];
+
+
+    ////////UPDATE COLOUMB FRICTION/////////////////////////
+
+    if( (x4 > 0) || ((x4 == 0) && (setOutSled > 0)) )
+    {
+      B_c_c = interpolateFrictionLookup( position, coloumbP, x2 );
+    }
+    else if( (x4 < 0) || ((x4 == 0) && (setOutSled < 0)) )
+    {
+      B_c_c = interpolateFrictionLookup( position, coloumbN, x2 );
+    }
+    
+    ////////////////////////////////////////////////////////
+
+    
+    ////////FRICTION COMPENSATION///////////////////////////
+    
+    //dead-band sign function
+    float sgn_x4 = x4_FIR;
+    if(      sgn_x4 >  0 ){ sgn_x4 =  1; }
+    else if( sgn_x4 <  0 ){ sgn_x4 = -1; }
+    else{                   sgn_x4 =  0; }   
+    
+    //dead-band x4
+    float x4_0 = x4;
+    if( (x4_0 < .05) && (x4_0 > -.05 )){ x4_0 = 0; }
+    
+    float frictionComp = r_pulley / K_t * (sgn_x4*2.7+(B_c_c*0) + x4_0*(B_v_c*0) );
+    
+    setOutSledNoComp = setOutSled;
+    setOutSled       = setOutSled + frictionComp;
+    
+    ////////////////////////////////////////////////////////
     
     //friction compensation
-    setOutSledNoComp = setOutSled;
-    if ((x4 > 0) || ((x4 == 0) && (setOutSled > 0)))
-    {
-      setOutSled = setOutSled + r_pulley / K_t * (B_c_neg);
-    }
-    else if ((x4 < 0) || ((x4 == 0) && (setOutSled < 0)))
-    {
-      setOutSled = setOutSled + r_pulley / K_t * (B_c_neg) * (-1);
-    }
-    else
-    {
-      setOutSled = 0;
-    } 
+    //  if ((x4 > 0) || ((x4 == 0) && (setOutSled > 0)))
+    //  {
+    //    setOutSled = setOutSled + r_pulley / K_t * (B_c_neg);
+    //  }
+    //  else if ((x4 < 0) || ((x4 == 0) && (setOutSled < 0)))
+    //  {
+    //    setOutSled = setOutSled + r_pulley / K_t * (B_c_neg) * (-1);
+    //  }
+    //  else
+    //  {
+    //    setOutSled = 0;
+    //  } 
     //<< 
   } //<<<<SWING-UP AND SLIDING MODE <END<
     //<<
@@ -758,3 +849,38 @@ int sign( float angle )
     return 0;
   }
 }
+
+//linear interpolation function for friction lookup
+float interpolate(float z0, float y0, float z1, float y1, float z)
+{
+    //if at the edge of the segment, return edge value
+    if (z <= z0) { return y0; }
+    if (z >= z1) { return y1; }
+
+    //interpolation @x between (x0,x1) and (y0,y1)
+    return y0 + ( ( z - z0 )/( z1 - z0 ) )*( y1 - y0 );
+}
+
+//find coloumb friction coefficient in lookup and interpolate
+float interpolateFrictionLookup( float position[], float coloumb[], float z )
+{
+    //saturate if out position is out of rail range
+    if( z < position[0]  ){ return coloumb[0];  }
+    if( z > position[67] ){ return coloumb[67]; }
+    
+    //find cart position in lookup
+    for( i = 0; i < (68-1); i++)
+    {
+        if( (position[i] <= z) && (position[i+1] >= z) )
+        {
+            //                  z0             y0        
+            return interpolate( position[i],   coloumb[i], 
+                                position[i+1], coloumb[+1], z );
+        }   //                  z1             y1
+    }
+}
+
+
+
+
+
