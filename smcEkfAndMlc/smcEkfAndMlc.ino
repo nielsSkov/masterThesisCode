@@ -135,7 +135,6 @@ float x2_last     = 0;
 float u_last      = 0;
 float x1_old      = 0;
 float catchAngle  = 0.02;
-int   logSwitch   = 0;
 int   slideOn     = 0;
 
 //ring-buffer and offset for FIR filter
@@ -206,13 +205,10 @@ void setup()
   //------------------------------------------------------//
 
   //set zero cart position at midle of rail for friction lookup
-  for( int i = 0; i < 68; i++ ){ position[i] -= 0.38; 
-                                 coloumbN[i] -= 1.232;
-                                 coloumbP[i] += 0.20; }
-
+  for( int i = 0; i < 68; i++ ){ position[i] -= 0.38; }
+  
   current_time = micros();
   EKF_initialize();
-
 }
 
 void loop()
@@ -253,15 +249,9 @@ void loop()
       //reset EKF
       P_correction_EKF_not_empty_init();
       
-      if( logSwitch == 1 )
-      {
-        //tell python script to stop logging
-        Serial.print("\n");
-        Serial.print("stopLogging");
-        
-        //only print stopLogging once
-        logSwitch = 0;
-      }
+      //tell python script to stop logging
+      Serial.print("\n");
+      Serial.print("stopLogging");
     }
     ///////Swing-Up and Sliding Mode///////////////////////
     else if( input == "1" )
@@ -270,7 +260,6 @@ void loop()
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");      
-      logSwitch = 1;
     }
     ///////Cart Mass and Friction Estimation///////////////
     else if( input == "5" )
@@ -279,7 +268,6 @@ void loop()
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");
-      logSwitch = 1;
     } 
     ///////Pendulum (1 & 2) Friction Estimation////////////
     else if( input == "6" )
@@ -288,7 +276,6 @@ void loop()
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");
-      logSwitch = 1;
     }
     else if( input == "f" )
     {
@@ -296,7 +283,6 @@ void loop()
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");      
-      logSwitch = 1;
     }
     ///////Reset Variables/////////////////////////////////
     else if( input == "r" )
@@ -339,7 +325,7 @@ void loop()
     float tSec = float(float(time_stamp)/1000000);  // [s]
     
     //print states for operator (system not controlled)
-    int deci = 5;
+    int deci = 2;
     Serial.print( tSec,     deci );
     Serial.print( ", "           );
     Serial.print( posPend1, deci );
@@ -350,23 +336,6 @@ void loop()
     Serial.print( ", "           );
     Serial.print( velSled,  deci );  
   } 
-
-  ///////CART REFFERENCE///////////////////////////////////
-//  if( fabs(cart_ref_goal - cart_ref) > 0.001 )
-//  {
-//    if( (cart_ref_goal - cart_ref) > 0 )
-//    {
-//      cart_ref += 0.1 / 150;
-//    } 
-//    else
-//    {
-//      cart_ref -= 0.1 / 150;
-//    }
-//  } 
-//  else
-//  {
-//    cart_ref = cart_ref_goal;
-//  }
 
   /////////////////////////////////////////////////////////
   ///////FIR FILTER////////////////////////////////////////
@@ -434,12 +403,51 @@ void loop()
   x2_last = x2_FIR;
   t_last  = time_stamp;
 
-  //update currently used variables if filter is in use
-  float current_x2;
-  float current_x4; 
-  if( slideOn == 0 ){ current_x2 = x2_FIR;
-                      current_x4 = x4_FIR; }
+  ///////INITIALIZE AND UPDATE EKF///////////////////////
+  double y_meas[2];
+  y_meas[0] = posSled;
+  y_meas[1] = posPend1;
 
+  if( first_run )
+  {
+    x_init[0] = posSled;
+    x_init[1] = posPend1;
+    x_init[2] = 0;
+    x_init[3] = 0;
+    first_run = false;
+  }
+
+  EKF(y_meas, setOutSledNoComp, SAMPLINGTIME, x_init, x_est_correction);
+
+  //change coordinate convention
+  float x1 = x_est_correction[1];
+  float x2 = x_est_correction[0]-0.38; //<--rail center as zero
+  float x3 = x_est_correction[3];
+  float x4 = x_est_correction[2];
+  
+  //update currently used variables if filter is in use
+  float current_x1;
+  float current_x2;
+  float current_x3; 
+  float current_x4;
+  //
+  if(      slideOn == 1 ){ current_x1 = x1;
+                           current_x2 = x2;
+                           current_x3 = x3;
+                           current_x4 = x4;     }
+  else if( slideOn == 0 ){ current_x1 = x1_FIR;
+                           current_x2 = x2_FIR;
+                           current_x3 = x3_FIR;
+                           current_x4 = x4_FIR; }
+
+  //creating wrapped vertion of angle for sliding mode
+  float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+  if( x1Wrap < 0 )
+  {
+    x1Wrap = float(x1Wrap + float(2*PI));
+  }
+  x1Wrap = float(x1Wrap - PI);
+  
   /////////////////////////////////////////////////////////
   ///////STOP ALL//////////////////////////////////////////
   /////////////////////////////////////////////////////////
@@ -454,25 +462,11 @@ void loop()
   /////////////////////////////////////////////////////////
   else if( setOut == 1 )
   {
+    //enable cart motor output 
+    digitalWrite(ENABLESLED, HIGH);
+    
     float tSec = float (time_stamp-time_now)/1000000;
 
-    double y_meas[2];
-    y_meas[0] = posSled;
-    y_meas[1] = posPend1; // Has to be in radians
-
-    if( first_run )
-    {
-      x_init[0] = posSled;
-      x_init[1] = posPend1; // Has to be in radians
-      x_init[2] = 0;
-      x_init[3] = 0;
-      first_run = false;
-    }
-
-    //initialize EKF
-    EKF(y_meas, setOutSledNoComp, SAMPLINGTIME, x_init, x_est_correction);
-
-    
     //>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<//
     //>>>>>SLIDING MODE PARAMETERS<<<<<<<<<<<<<<<<<<<<<<<<<//
     //>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
@@ -498,45 +492,15 @@ void loop()
     setOutSled = 0;
     float u    = 0;
 
-    //enable cart motor output 
-    digitalWrite(ENABLESLED, HIGH);
-    
-    //change coordinate convention
-    float x1 = x_est_correction[1];
-    float x2 = x_est_correction[0]-0.38; //<--rail center as zero
-    float x3 = x_est_correction[3];
-    float x4 = x_est_correction[2];
- 
-    //creating wrapped vertion of angle for sliding mode
-    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
-    if( x1Wrap < 0 )
-    {
-      x1Wrap = float(x1Wrap + float(2*PI));
-    }
-    x1Wrap = float(x1Wrap - PI);
-    x1 = x1Wrap;
-    
-    //time converted from micro sec to sec
-    //float tSec = float(float(time_stamp)/1000000);  // [s] 
-    
     float B_c_c = estimateCartFriction( position,   coloumbP,   coloumbN,
                                         current_x2, current_x4, setOutSled );
     
-    // set friction based on velocity direction
-    // if( (x4 > 0) || ((x4 == 0) && (setOutSled > 0)) )
-    // {
-    //   B_v_c = B_v_pos;
-    // }
-    // else if( (x4 < 0) || ((x4 == 0) && (setOutSled < 0)) )
-    // {
-    //   B_v_c = B_v_neg;
-    // }
-  
+    
     /////////////////////////////////////////////////////////
     ///////CATCH - SLIDING MODE//////////////////////////////
     /////////////////////////////////////////////////////////
     //
-    if(  abs(x1Wrap) < catchAngle  )
+    if( abs(x1Wrap) < catchAngle )
     {
       slideOn = 1;
 
@@ -544,10 +508,10 @@ void loop()
       catchAngle = 0.2;
       
       //inverse of function on output
-      float g_b_inv = m_c + m_b - m_b*cos(x1)*cos(x1);
+      float g_b_inv = m_c + m_b - m_b*cos(x1Wrap)*cos(x1Wrap);
       
       //sliding manifold
-      float s = x4 - k2*(x3 - (x4*cos(x1))/l) + k1*x1 + k3*x2;
+      float s = x4 - k2*(x3 - (x4*cos(x1Wrap))/l) + k1*x1Wrap + k3*x2;
       
       //saturation function
       float    satS = s / epsilon;
@@ -603,14 +567,8 @@ void loop()
       float sgnIn = cos(x1_FIR)*x3_FIR;
       float sgn   = 1;
       //
-      if( sgnIn >= 0 )
-      {
-        sgn = 1;
-      }
-      else if( sgnIn < 0 )
-      {
-        sgn = -1;
-      }
+      if(      sgnIn >= 0 ){ sgn =  1; }
+      else if( sgnIn <  0 ){ sgn = -1; }
       
       //calculate maximum acceleration of cart
       float i_max = 4.58+.5;
@@ -618,7 +576,7 @@ void loop()
       float a_max = u_max/(m_c+m_b);
       
       //extra energy offset from equilibrium to get fast catch
-      float E_off = -.03; // -.008;
+      float E_off = -.03; // -.007;
       
       //energy error
       float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1_FIR) - 1) + E_off;
@@ -627,21 +585,14 @@ void loop()
       float a_c = -k*E_delta*sgn;
       
       //saturation
-      if( a_c > a_max )
-      {
-        a_c = a_max;
-      }
-      else if( a_c < -a_max )
-      {
-        a_c = -a_max;
-      }
-      //a_c = a_c otherwise
+      if(      a_c >  a_max ){ a_c =  a_max; }
+      else if( a_c < -a_max ){ a_c = -a_max; } //a_c = a_c otherwise
       
       //estimation of needed actuation to achieve cart acceleration, a_c
       float theta_acc_est = ( m_c + m_b )*( -B_v_p*x3_FIR -tanh(k_tanh*x3_FIR)*F_c_p + m_b*g*l*sin(x1_FIR) )/( l*l*m_b*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) ) + ( cos(x1_FIR)*(u_last - m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR) )/( l*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) );
       
       //gain for x-control
-      float k_lin[] = { 10.5460 , 15.8190 };
+      float k_lin[] = { 10.5460, 15.8190 };
       
       //linear control of cart position
       float lin_u =  -k_lin[1]*x2 -k_lin[1]*x4;
@@ -674,43 +625,19 @@ void loop()
     setOutSledNoComp = setOutSled;
     setOutSled       = setOutSled + frictionComp;
 
-    //printing for data collection
-    float deci = 5; 
-    Serial.print( tSec,             deci );
-    Serial.print( ", "                   );
-    Serial.print( x1,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x1_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( x2,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x2_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( x3,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x3_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( x4,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x4_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( setOutSledNoComp, deci );
-    Serial.print( ", "                   );
-    Serial.print( setOutSled,       deci );
+    //choose to print readable data (0) to print for data collection (1)
+    int collectData = 1;
+    
+    //choose nr of decimals printed after decimal point
+    int deci = 5;
 
-    //friction compensation
-    //  if ((x4 > 0) || ((x4 == 0) && (setOutSled > 0)))
-    //  {
-    //    setOutSled = setOutSled + r_pulley / K_t * (B_c_neg);
-    //  }
-    //  else if ((x4 < 0) || ((x4 == 0) && (setOutSled < 0)))
-    //  {
-    //    setOutSled = setOutSled + r_pulley / K_t * (B_c_neg) * (-1);
-    //  }
-    //  else
-    //  {
-    //    setOutSled = 0;
-    //  } 
+    //print mesurements depending on choice above
+    printToTerminal( collectData, deci,   tSec,
+                     x1,          x2,       x3,     x4,
+                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                     posPend1,    posPend2,         velPend1,   velPend2,
+                     posSled,     velSled                                );
     //<< 
   } //<<<<SWING-UP AND SLIDING MODE <END<
     //<<
@@ -755,20 +682,25 @@ void loop()
       digitalWrite(ENABLESLED, LOW);
       if( velSled == 0 )
       {
-        logSwitch = 1; //when time is up and the cart is
         setOut    = 0; //no longer moving, return to complete stop,
       }                //where logging is also stoped
     }
     
-    //print data to log 
-    int deci = 5;
-    Serial.print( tSec,       deci );
-    Serial.print( ", "             );
-    Serial.print( setOutSled, deci );
-    Serial.print( ", "             );
-    Serial.print( posSled,    deci );
-    Serial.print( ", "             );
-    Serial.print( velSled,    deci );
+    //choose to print readable data (0) to print for data collection (1)
+    int collectData = 1;
+    
+    //choose nr of decimals printed after decimal point
+    int deci = 2;
+
+    float B_c_c = 0; //to use print function (otherwise not declared here)
+
+    //print mesurements depending on choice above
+    printToTerminal( collectData, deci,   tSec,
+                     x1,          x2,       x3,     x4,
+                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                     posPend1,    posPend2,         velPend1,   velPend2,
+                     posSled,     velSled                                );
     //<<
   } //<<<<CART FRICTION AND MASS ESTIMATION <END<
     //<<
@@ -777,10 +709,15 @@ void loop()
   /////////////////////////////////////////////////////////
   else if( setOut == 6 )
   {
-    float tSec = float (time_stamp-time_now)/1000000;
+    //choose to print readable data (0) to print for data collection (1)
+    int collectData = 1;
     
-    //select number of logged decimals
-    int deci      = 5;
+    //choose nr of decimals printed after decimal point
+    int deci = 5;
+
+    float B_c_c = 0; //to use print function (otherwise not declared here)
+
+    float tSec = float (time_stamp-time_now)/1000000;
     
     //select pendulum to test
     int pend1test = 0;
@@ -790,21 +727,21 @@ void loop()
     //upright equilibrium, print data to log 
     if( pend1test && posPend1 > 0.01 )
     {
-      Serial.print( tSec,     deci );
-      Serial.print( ", "           );
-      Serial.print( posPend1, deci );
-      Serial.print( ", "           );
-      Serial.print( velPend1, deci );
-      Serial.print( "\n"           );
+      printToTerminal( collectData, deci,     tSec,
+                       x1,          x2,       x3,     x4,
+                       x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+                       x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                       posPend1,    posPend2,         velPend1,   velPend2,
+                       posSled,     velSled                                );
     }
     else if( pend2test && posPend2 > 0.01 )
     {
-      Serial.print( tSec,     deci );
-      Serial.print( ", "           );
-      Serial.print( posPend2, deci );
-      Serial.print( ", "           );
-      Serial.print( velPend2, deci );
-      Serial.print( "\n"           );
+      printToTerminal( collectData, deci,     tSec,
+                       x1,          x2,       x3,     x4,
+                       x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+                       x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                       posPend1,    posPend2,         velPend1,   velPend2,
+                       posSled,     velSled                                );
     }
     //<<
   } //<<<<PENDULUM FRICTION ESTIMATION <END<
@@ -818,6 +755,8 @@ void loop()
     slideOn = 0;
     //enable cart motor output 
     digitalWrite(ENABLESLED, HIGH);
+   
+    float tSec = float (time_stamp-time_now)/1000000;
     
     float B_c_c = estimateCartFriction( position,   coloumbP,   coloumbN,
                                         current_x2, current_x4, setOutSled );
@@ -825,7 +764,21 @@ void loop()
     float frictionComp = cartFrictionCompensation( B_c_c,    B_v_c, current_x4,
                                                    r_pulley, K_t               );
 
-    setOutSled = frictionComp;
+    setOutSled = frictionComp; 
+    
+    //choose to print readable data (0) to print for data collection (1)
+    int collectData = 1;
+    
+    //choose nr of decimals printed after decimal point
+    int deci = 5;
+
+    //print mesurements depending on choice above
+    printToTerminal( collectData, deci,   tSec,
+                     x1,          x2,       x3,     x4,
+                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                     posPend1,    posPend2,         velPend1,   velPend2,
+                     posSled,     velSled                                );
     //<<
   } //<<<<FRICTION COMPENSATION ONLY <END<
     //<<
@@ -857,23 +810,6 @@ void loop()
 } //<<<<MAIN-LOOP <END<
   //<<
 
-//sign-function
-int sign( float angle )
-{
-  if( angle > 0 )
-  {
-    return 1;
-  } 
-  else if( angle < 0 )
-  {
-    return -1;
-  } 
-  else
-  {
-    return 0;
-  }
-}
-
 //linear interpolation function for friction lookup
 float interpolate(float z0, float y0, float z1, float y1, float z)
 {
@@ -897,9 +833,11 @@ float interpolateFrictionLookup( float position[], float coloumb[], float z )
     {
         if( (position[i] <= z) && (position[i+1] >= z) )
         {
+           // Serial.print( ", "                );
+           // Serial.print( colomb[i],            5 );
             //                  z0             y0        
             return interpolate( position[i],   coloumb[i], 
-                                position[i+1], coloumb[+1], z );
+                                position[i+1], coloumb[i+1], z );
         }   //                  z1             y1
     }
 }
@@ -943,3 +881,56 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
   return frictionComp;
 }
 
+void printToTerminal( int   collectData, int   deci, float tSec,
+                      float x1,          float x2,     
+                      float x3,          float x4,
+                      float x1_FIR,      float x2_FIR,
+                      float x3_FIR,      float x4_FIR,
+                      float x1Wrap,      float setOutSledNoComp,
+                      float setOutSled,  float B_c_c,
+                      float posPend1,    float posPend2,
+                      float velPend1,    float velPend2,
+                      float posSled,     float velSled             )
+{
+  if( collectData )
+  {
+    //printing for data collection
+    Serial.print( tSec,             deci );
+    Serial.print( ", "                   );
+    Serial.print( x1,               deci );
+    Serial.print( ", "                   );
+    Serial.print( x1Wrap,           deci );
+    Serial.print( ", "                   );
+    Serial.print( x1_FIR,           deci );
+    Serial.print( ", "                   );
+    Serial.print( x2,               deci );
+    Serial.print( ", "                   );
+    Serial.print( x2_FIR,           deci );
+    Serial.print( ", "                   );
+    Serial.print( x3,               deci );
+    Serial.print( ", "                   );
+    Serial.print( x3_FIR,           deci );
+    Serial.print( ", "                   );
+    Serial.print( x4,               deci );
+    Serial.print( ", "                   );
+    Serial.print( x4_FIR,           deci );
+    Serial.print( ", "                   );
+    Serial.print( setOutSledNoComp, deci );
+    Serial.print( ", "                   );
+    Serial.print( setOutSled,       deci );
+    Serial.print( ", "                   );
+    Serial.print( B_c_c,            deci );
+  }
+  else
+  {
+    Serial.print( tSec,     deci );
+    Serial.print( ", "           );
+    Serial.print( posPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( posSled,  deci );
+    Serial.print( ", "           );
+    Serial.print( velPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( velSled,  deci );
+  }
+}
