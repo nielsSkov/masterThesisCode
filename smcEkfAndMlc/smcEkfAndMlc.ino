@@ -63,17 +63,49 @@ float position[] =
 //    4.4364, 4.2977, 4.0892, 4.0089, 3.9927, 3.8960, 3.8626, 3.9456, 
 //    4.0244, 4.0068, 4.0124, 4.0512                                 };
 //third attempt
+//float coloumbP[] =
+//  { 2.0599, 2.0662, 2.1381, 2.1714, 2.1948, 2.2462, 2.2906, 2.3641,
+//    2.4541, 2.5419, 2.6354, 2.7466, 2.8576, 2.9494, 3.0025, 3.0104,
+//    3.0008, 2.9567, 2.8189, 2.6462, 2.4794, 2.3163, 2.1865, 2.0951,
+//    2.0488, 2.0721, 2.0967, 2.1510, 2.2220, 2.3104, 2.3658, 2.4560,
+//    2.5617, 2.7070, 2.8373, 2.9427, 3.0279, 3.1276, 3.1694, 3.1450,
+//    3.0841, 2.9708, 2.8381, 2.6918, 2.5490, 2.4321, 2.4032, 2.3836,
+//    2.4188, 2.5065, 2.6558, 2.8007, 2.9618, 3.0691, 3.1635, 3.2093,
+//    3.2171, 3.1765, 3.1086, 3.0108, 2.9393, 2.9058, 2.8899, 2.8902,
+//    2.8996, 2.9615, 2.9700, 3.0784                                 };
+//fourth attempt
+//float coloumbP[] =
+//  { 2.5089, 2.4863, 2.5210, 2.5631, 2.5894, 2.6127, 2.6584, 2.7284,
+//    2.8329, 2.9804, 3.1066, 3.1965, 3.2661, 3.3395, 3.4087, 3.4750,
+//    3.4930, 3.4163, 3.3189, 3.1266, 2.8755, 2.6637, 2.4754, 2.4012,
+//    2.4196, 2.4655, 2.5260, 2.5595, 2.6007, 2.6651, 2.7505, 2.8580,
+//    2.9512, 3.0791, 3.2105, 3.3952, 3.5322, 3.5814, 3.5944, 3.5811,
+//    3.5155, 3.4185, 3.2882, 3.0785, 2.9111, 2.7864, 2.7020, 2.7022,
+//    2.7788, 2.8666, 2.9840, 3.1490, 3.3364, 3.5304, 3.7119, 3.7837,
+//    3.7740, 3.6458, 3.5251, 3.3996, 3.2945, 3.2618, 3.2475, 3.2676,
+//    3.3051, 3.3647, 3.3851, 3.4460                                 };
+//fourth attempt (a lot less smoothing)
+//float coloumbP[] =
+//  { 2.5089, 2.4360, 2.5843, 2.5293, 2.6041, 2.6122, 2.6421, 2.6728,
+//    2.8433, 2.9377, 3.1647, 3.2575, 3.2460, 3.2609, 3.4466, 3.5619,
+//    3.4723, 3.5184, 3.2847, 3.1919, 2.9892, 2.4870, 2.4113, 2.3882,
+//    2.3820, 2.4536, 2.5322, 2.6208, 2.5802, 2.5511, 2.8028, 2.8654,
+//    3.0138, 2.9110, 3.2739, 3.3821, 3.6021, 3.6725, 3.5723, 3.5177,
+//    3.6073, 3.5415, 3.1618, 3.1645, 2.8854, 2.7091, 2.6446, 2.7139,
+//    2.6852, 2.9086, 2.9872, 3.0896, 3.2542, 3.6685, 3.6848, 3.9229,
+//    3.7519, 3.8016, 3.4059, 3.3272, 3.3840, 3.1988, 3.1939, 3.2335,
+//    3.4026, 3.2925, 3.4084, 3.4460                                 };
+//fourth attempt (medium smoothing)
 float coloumbP[] =
-  { 2.0599, 2.0662, 2.1381, 2.1714, 2.1948, 2.2462, 2.2906, 2.3641,
-    2.4541, 2.5419, 2.6354, 2.7466, 2.8576, 2.9494, 3.0025, 3.0104,
-    3.0008, 2.9567, 2.8189, 2.6462, 2.4794, 2.3163, 2.1865, 2.0951,
-    2.0488, 2.0721, 2.0967, 2.1510, 2.2220, 2.3104, 2.3658, 2.4560,
-    2.5617, 2.7070, 2.8373, 2.9427, 3.0279, 3.1276, 3.1694, 3.1450,
-    3.0841, 2.9708, 2.8381, 2.6918, 2.5490, 2.4321, 2.4032, 2.3836,
-    2.4188, 2.5065, 2.6558, 2.8007, 2.9618, 3.0691, 3.1635, 3.2093,
-    3.2171, 3.1765, 3.1086, 3.0108, 2.9393, 2.9058, 2.8899, 2.8902,
-    2.8996, 2.9615, 2.9700, 3.0784                                 };
-
+  { 2.5089, 2.4779, 2.5412, 2.5587, 2.5882, 2.6186, 2.6376, 2.6989,
+    2.8233, 2.9654, 3.1410, 3.2437, 3.2481, 3.2897, 3.4364, 3.5252,
+    3.5073, 3.4635, 3.3174, 3.1777, 2.9318, 2.5645, 2.4085, 2.3895,
+    2.3946, 2.4522, 2.5371, 2.5996, 2.5777, 2.6028, 2.7608, 2.8936,
+    2.9561, 3.0029, 3.2153, 3.4121, 3.5772, 3.6474, 3.5797, 3.5428,
+    3.5870, 3.4824, 3.2406, 3.1043, 2.9090, 2.7204, 2.6684, 2.6877,
+    2.7343, 2.8770, 2.9953, 3.0911, 3.3058, 3.5883, 3.7440, 3.8397,
+    3.8122, 3.7122, 3.4670, 3.3471, 3.3368, 3.2350, 3.1918, 3.2628,
+    3.3465, 3.3398, 3.3890, 3.4460                                 };
 //coloumb friction coefficient 
 //at each position for negative velocity
 //
@@ -100,17 +132,51 @@ float coloumbP[] =
 //    3.5100, 3.5486, 3.6085, 3.7025, 3.8501, 3.8784, 3.8333, 3.7636, 
 //    3.7292, 3.8079, 3.7853, 3.6189                                 };
 //third attempt
+//float coloumbN[] =
+//  { 5.6263, 5.4987, 5.1417, 4.9257, 4.6487, 4.3322, 4.0786, 3.8225,
+//    3.5715, 3.3112, 3.0779, 2.9407, 2.8604, 2.8355, 2.8457, 2.9103,
+//    3.0284, 3.1653, 3.3837, 3.6218, 3.8165, 3.9902, 4.1001, 4.1013,
+//    4.0578, 3.8796, 3.6658, 3.4336, 3.1961, 2.9678, 2.8269, 2.6447,
+//    2.4937, 2.3306, 2.1720, 2.0713, 1.9899, 1.9119, 1.9537, 2.0036,
+//    2.1147, 2.2597, 2.4044, 2.5582, 2.6746, 2.7244, 2.7459, 2.7200,
+//    2.6334, 2.5232, 2.4298, 2.3751, 2.3673, 2.3480, 2.3565, 2.4114,
+//    2.4775, 2.5494, 2.6026, 2.6170, 2.6656, 2.6750, 2.7167, 2.7325,
+//    2.7000, 2.6817, 2.7051, 2.5191                                 };
+//fourth attempt
+//float coloumbN[] =
+//  { 6.0457, 5.8981, 5.5088, 5.2078, 4.9781, 4.7767, 4.5121, 4.2287,
+//    3.9130, 3.6207, 3.4146, 3.2296, 3.1161, 3.1008, 3.1556, 3.2596,
+//    3.3579, 3.5195, 3.6744, 3.8990, 4.2394, 4.5244, 4.7341, 4.7770,
+//    4.6029, 4.3123, 4.0221, 3.7270, 3.5362, 3.3636, 3.1773, 3.0404,
+//    2.8838, 2.7131, 2.6023, 2.4179, 2.2847, 2.2331, 2.1898, 2.2770,
+//    2.4242, 2.5996, 2.8329, 3.0099, 3.1690, 3.2641, 3.2670, 3.1867,
+//    3.0541, 2.9050, 2.7357, 2.6472, 2.6123, 2.6892, 2.8068, 2.8735,
+//    2.9326, 2.8925, 2.9317, 3.0037, 3.0525, 3.1113, 3.0919, 3.0538,
+//    3.0692, 3.0503, 3.0857, 2.8821                                 };
+//fourth attempt (a lot less smoothing)
+//float coloumbN[] =
+//  { 6.0457, 6.0008, 5.4575, 5.0818, 4.9099, 4.8706, 4.6863, 4.1072,
+//    3.8124, 3.7340, 3.3521, 3.1361, 3.0851, 3.0505, 3.1449, 3.1818,
+//    3.4730, 3.4172, 3.6360, 3.9225, 4.0484, 4.6924, 4.9115, 4.8782,
+//    4.6373, 4.4396, 3.8567, 3.7538, 3.4382, 3.4088, 3.2508, 2.9450,
+//    2.8026, 2.9261, 2.4537, 2.4430, 2.2954, 2.0959, 2.2386, 2.1855,
+//    2.3199, 2.7089, 2.7662, 3.0776, 3.1715, 3.3254, 3.3598, 3.2184,
+//    3.0543, 2.8371, 2.8494, 2.5146, 2.5082, 2.6631, 2.8188, 3.0751,
+//    2.7527, 3.0189, 2.8425, 2.9274, 3.1565, 3.1543, 3.0928, 3.0650,
+//    2.9287, 3.1714, 3.1068, 2.8821                                 };
+//fourth attempt (medium smoothing)
 float coloumbN[] =
-  { 5.6263, 5.4987, 5.1417, 4.9257, 4.6487, 4.3322, 4.0786, 3.8225,
-    3.5715, 3.3112, 3.0779, 2.9407, 2.8604, 2.8355, 2.8457, 2.9103,
-    3.0284, 3.1653, 3.3837, 3.6218, 3.8165, 3.9902, 4.1001, 4.1013,
-    4.0578, 3.8796, 3.6658, 3.4336, 3.1961, 2.9678, 2.8269, 2.6447,
-    2.4937, 2.3306, 2.1720, 2.0713, 1.9899, 1.9119, 1.9537, 2.0036,
-    2.1147, 2.2597, 2.4044, 2.5582, 2.6746, 2.7244, 2.7459, 2.7200,
-    2.6334, 2.5232, 2.4298, 2.3751, 2.3673, 2.3480, 2.3565, 2.4114,
-    2.4775, 2.5494, 2.6026, 2.6170, 2.6656, 2.6750, 2.7167, 2.7325,
-    2.7000, 2.6817, 2.7051, 2.5191                                 };
-
+  { 6.0457, 6.0008, 5.4575, 5.0818, 4.9099, 4.8706, 4.6863, 4.1072,
+    3.8124, 3.7340, 3.3521, 3.1361, 3.0851, 3.0505, 3.1449, 3.1818,
+    3.4730, 3.4172, 3.6360, 3.9225, 4.0484, 4.6924, 4.9115, 4.8782,
+    4.6373, 4.4396, 3.8567, 3.7538, 3.4382, 3.4088, 3.2508, 2.9450,
+    2.8026, 2.9261, 2.4537, 2.4430, 2.2954, 2.0959, 2.2386, 2.1855,
+    2.3199, 2.7089, 2.7662, 3.0776, 3.1715, 3.3254, 3.3598, 3.2184,
+    3.0543, 2.8371, 2.8494, 2.5146, 2.5082, 2.6631, 2.8188, 3.0751,
+    2.7527, 3.0189, 2.8425, 2.9274, 3.1565, 3.1543, 3.0928, 3.0650,
+    2.9287, 3.1714, 3.1068, 2.8821                                 };
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////
 
 // Create joint objects
@@ -118,30 +184,42 @@ Joint  sled( 1, SAMPLINGTIME );
 Joint pend1( 2, SAMPLINGTIME );
 Joint pend2( 3, SAMPLINGTIME );
 
-// Global variables
-float setOutSled  = 0;
-float setOutPend1 = 0;
-float velSled     = 0;
-float velPend1    = 0;
-float velPend2    = 0;
+
+struct firStru
+{
+  float xIn;         //   set window size here
+  float buff[5];     //<--must be same size as
+  int   offset;                               //
+};                                             //
+                                                //
+///////Global Variables////////////////////////////////////
+                                               //
+//ring-buffer and offset for FIR filter     //
+int   offsetFIR_x3 = 0;                  //
+int   offsetFIR_x4 = 0;               //
+float buffFIR_x3[5];              //<--here
+float buffFIR_x4[5];          //<--and here
+
+float t_last       = 0;
+float x1_last      = 0;
+float x2_last      = 0;
+float x3_last      = 0;
+float x4_last      = 0;
+
+float setOutSled   = 0;
+float setOutPend1  = 0;
+float velSled      = 0;
+float velPend1     = 0;
+float velPend2     = 0;
 float posSled;
 float posPend1;
 float posPend2;
-int   setOut      = 0;
+int   setOut       = 0;
 
-float t_last      = 0;
-float x1_last     = 0;
-float x2_last     = 0;
-float u_last      = 0;
-float x1_old      = 0;
-float catchAngle  = 0.02;
-int   slideOn     = 0;
-
-//ring-buffer and offset for FIR filter
-int   offsetFIR      = 0;
-int   offsetFIR2     = 0;
-float ringBuffFIR[]  = { 0, 0, 0, 0, 0};
-float ringBuffFIR2[] = { 0, 0, 0, 0, 0};
+float u_last       = 0;
+float x1_old       = 0;
+float catchAngle   = 0.02;
+int   slideOn      = 0;
 
 unsigned long current_time = 0;
 unsigned long last_time    = 0;
@@ -338,69 +416,80 @@ void loop()
   } 
 
   /////////////////////////////////////////////////////////
-  ///////FIR FILTER////////////////////////////////////////
+  ///////FIR (MA) FILTER INIT//////////////////////////////
   /////////////////////////////////////////////////////////
-
-  float x1_FIR = posPend1;
 
   //time difference for nummerical diff
   float t_delta = float(float(time_stamp-t_last)/1000000); // [s]
-  
-  float x3_FIR = (x1_FIR - x1_last)/t_delta;
 
-  //----implementation of FIR filter (with ring buffer)----
-
-  //set window size
-  float  M_FIR = 5;
-  //filter coefficients
-  float h[]  = { 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR, 1/M_FIR};
-
-  //update new mesurement in ring-buffer
-  ringBuffFIR[offsetFIR] = x3_FIR;
-  
-  //initializing variable to be updated with filtered value
-  x3_FIR = 0;
-
-  //loop through ring-buffer applying filter
-  for( int j = offsetFIR; j < M_FIR+offsetFIR; j++ )
-  {
-    int ringDex = j % int(M_FIR);
-
-    x3_FIR += ringBuffFIR[ringDex]*h[ringDex];
-  }
-  
-  //move ring-buffer offset one step
-  if( offsetFIR++ == M_FIR-1 ){ offsetFIR = 0; }
-  //NOTE: it checks first then increments
-
-  //-----------------position FIR---------------------------
-
+  //mesurements used in FIR filters
+  float x1_FIR = posPend1;
   float x2_FIR = posSled-0.38; //<--rail center as zero
-
+  
+  //nummerical diff for FIR filters
+  float x3_FIR = (x1_FIR - x1_last)/t_delta;
   float x4_FIR = (x2_FIR - x2_last)/t_delta;
-
-  //----implementation of FIR filter (with ring buffer)----
-
-  //update new mesurement in ring-buffer
-  ringBuffFIR2[offsetFIR2] = x4_FIR;
   
-  //initializing variable to be updated with filtered value
-  x4_FIR = 0;
-
-  //loop through ring-buffer applying filter
-  for( int j = offsetFIR2; j < M_FIR+offsetFIR2; j++ )
+  //set window size for all FIR filters
+  float  N_FIR = (sizeof(buffFIR_x3)/sizeof(buffFIR_x3[0]));  //<--same size as for x4
+  
+  //filter coefficients
+  float h[(int)N_FIR];
+  for( int i = 0; i< N_FIR; i++ )
   {
-    int ringDex2 = j % int(M_FIR);
-
-    x4_FIR += ringBuffFIR2[ringDex2]*h[ringDex2];
+    h[i]  = 1/N_FIR;
   }
-  
-  //move ring-buffer offset one step
-  if( offsetFIR2++ == M_FIR-1 ){ offsetFIR2 = 0; }
-  //NOTE: it checks first then increments
 
+  /////////////////////////////////////////////////////////
+  ///////FIR (MA) FILTERS//////////////////////////////////
+  /////////////////////////////////////////////////////////
+
+  //struct for FIR (MA) filter of x3 (angle velocity)
+  struct firStru sx3 =
+  {
+    x3_FIR,
+    { 0 },
+    offsetFIR_x3
+  };
+  memcpy( sx3.buff, buffFIR_x3, sizeof(buffFIR_x3) );
+  
+  //calculate angular velocity through FIR (MA) filter
+  sx3 = FIR( sx3, h, (int)N_FIR );
+
+  //assigning output of filter
+          x3_FIR       = sx3.xIn;
+          offsetFIR_x3 = sx3.offset;
+  memcpy( buffFIR_x3,    sx3.buff,   sizeof(buffFIR_x3) );
+
+  //struct for FIR (MA) filter of x4 (cart velocity)
+  struct firStru sx4 =
+  {
+    x4_FIR,
+    { 0 },
+    offsetFIR_x4
+  };
+  memcpy( sx4.buff, buffFIR_x4, sizeof(buffFIR_x4) );
+  
+  //calculate angular velocity through FIR (MA) filter
+  sx4 = FIR( sx4, h, (int)N_FIR );
+
+  //assigning output of filter
+          x4_FIR       = sx4.xIn;
+          offsetFIR_x4 = sx4.offset;
+  memcpy( buffFIR_x4,    sx4.buff,   sizeof(buffFIR_x4) );
+
+  /////////////////////////////////////////////////////////
+  ///////EXPONENTIAL SMOOTHING FILTER//////////////////////
+  /////////////////////////////////////////////////////////
+  
+  float alpha = .8;
+  x3_FIR      = alpha*x3_FIR + ( 1 - alpha )*x3_last;
+  x4_FIR      = alpha*x4_FIR + ( 1 - alpha )*x4_last;
+  
   x1_last = x1_FIR;
   x2_last = x2_FIR;
+  x3_last = x3_FIR;
+  x4_last = x4_FIR;
   t_last  = time_stamp;
 
   ///////INITIALIZE AND UPDATE EKF///////////////////////
@@ -495,12 +584,27 @@ void loop()
     float B_c_c = estimateCartFriction( position,   coloumbP,   coloumbN,
                                         current_x2, current_x4, setOutSled );
     
-    
+    /////////////////////////////////////////////////////////
+    //////EDGE OF RAIL SECURITY//////////////////////////////
+    /////////////////////////////////////////////////////////
+    //
+    float sgnCart = posSled-.38;
+    if(      sgnCart > 0 ){ sgnCart =  1; }
+    else if( sgnCart < 0 ){ sgnCart = -1; }
+    else                  { sgnCart =  0; }
+    //
+    //                             vel away from ceneter
+    if( (abs(posSled-.38) > .08 && sgnCart*velSled > 1) )
+    {
+      Serial.println("Secure Edge Active");
+      
+      setOutSled = -sgnCart*5; //<--breaking cart runs away
+    }
     /////////////////////////////////////////////////////////
     ///////CATCH - SLIDING MODE//////////////////////////////
     /////////////////////////////////////////////////////////
     //
-    if( abs(x1Wrap) < catchAngle )
+    else if( abs(x1Wrap) < catchAngle )
     {
       slideOn = 1;
 
@@ -632,12 +736,12 @@ void loop()
     int deci = 5;
 
     //print mesurements depending on choice above
-    printToTerminal( collectData, deci,   tSec,
-                     x1,          x2,       x3,     x4,
-                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
-                     posPend1,    posPend2,         velPend1,   velPend2,
-                     posSled,     velSled                                );
+//    printToTerminal( collectData, deci,   tSec,
+//                     x1,          x2,       x3,     x4,
+//                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+//                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+//                     posPend1,    posPend2,         velPend1,   velPend2,
+//                     posSled,     velSled                                );
     //<< 
   } //<<<<SWING-UP AND SLIDING MODE <END<
     //<<
@@ -810,6 +914,14 @@ void loop()
 } //<<<<MAIN-LOOP <END<
   //<<
 
+
+
+
+
+
+
+
+
 //linear interpolation function for friction lookup
 float interpolate(float z0, float y0, float z1, float y1, float z)
 {
@@ -868,9 +980,15 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
 {
   //dead-band sign function
   float sgn_x4 = x4;
-  if(      sgn_x4 >  0.01 ){ sgn_x4 =  1; }
-  else if( sgn_x4 < -0.01 ){ sgn_x4 = -1; }
+  if(      sgn_x4 >  0.018 ){ sgn_x4 =  1; }
+  else if( sgn_x4 < -0.018 ){ sgn_x4 = -1; }
   else{                     sgn_x4 =  0; }   
+  
+  //saturation function
+  float   epsilon = 0.03;
+  float    sat_x4 = x4 / epsilon;
+  if(      sat_x4 >  1 ){ sat_x4 =  1;  }
+  else if( sat_x4 < -1 ){ sat_x4 = -1;  }
   
   //dead-band x4
   float x4_0 = x4;
@@ -879,6 +997,29 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
   float frictionComp = r / k_tau *( (sgn_x4*(B_c_c)) + x4_0*B_v_c*0 );
   
   return frictionComp;
+}
+
+struct firStru FIR( struct firStru x, float h[], int N )
+{
+  //update new mesurement in ring-buffer
+  x.buff[x.offset] = x.xIn;
+
+  //initializing variable to be updated with filtered value
+  x.xIn = 0;
+
+  //loop through ring-buffer applying filter
+  for( int j = x.offset; j < N+x.offset; j++ )
+  {
+    int ringdex = j % N;
+
+    x.xIn += x.buff[ringdex]*h[ringdex];
+  }
+  
+  //move ring-buffer offset one step
+  if( x.offset++ == N-1 ){ x.offset = 0; }
+  //NOTE: it checks first, then increments
+
+  return x;  //<--struct is returned
 }
 
 void printToTerminal( int   collectData, int   deci, float tSec,
