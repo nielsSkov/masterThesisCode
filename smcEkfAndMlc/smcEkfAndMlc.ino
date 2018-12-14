@@ -283,7 +283,9 @@ void setup()
   //------------------------------------------------------//
 
   //set zero cart position at midle of rail for friction lookup
-  for( int i = 0; i < 68; i++ ){ position[i] -= 0.38; }
+  for( int i = 0; i < 68; i++ ){ position[i] -= 0.38; 
+                                 coloumbN[i] += 0.32;
+                                 coloumbP[i] -= 1.25; }
   
   current_time = micros();
   EKF_initialize();
@@ -408,9 +410,13 @@ void loop()
     Serial.print( ", "           );
     Serial.print( posPend1, deci );
     Serial.print( ", "           );
+    Serial.print( posPend2, deci );
+    Serial.print( ", "           );
     Serial.print( posSled,  deci );
     Serial.print( ", "           );
     Serial.print( velPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( velPend2, deci );
     Serial.print( ", "           );
     Serial.print( velSled,  deci );  
   } 
@@ -980,9 +986,9 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
 {
   //dead-band sign function
   float sgn_x4 = x4;
-  if(      sgn_x4 >  0.018 ){ sgn_x4 =  1; }
-  else if( sgn_x4 < -0.018 ){ sgn_x4 = -1; }
-  else{                     sgn_x4 =  0; }   
+  if(      sgn_x4 >  0.012 ){ sgn_x4 =  1; }
+  else if( sgn_x4 < -0.012 ){ sgn_x4 = -1; }
+  else{                       sgn_x4 =  0; }   
   
   //saturation function
   float   epsilon = 0.03;
@@ -994,7 +1000,7 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
   float x4_0 = x4;
   if( (x4_0 < .1) && (x4_0 > -.1 )){ x4_0 = 0; }
   
-  float frictionComp = r / k_tau *( (sgn_x4*(B_c_c)) + x4_0*B_v_c*0 );
+  float frictionComp = r / k_tau *( (sat_x4*(B_c_c)) + x4_0*B_v_c*0 );
   
   return frictionComp;
 }
@@ -1038,29 +1044,40 @@ void printToTerminal( int   collectData, int   deci, float tSec,
     //printing for data collection
     Serial.print( tSec,             deci );
     Serial.print( ", "                   );
-    Serial.print( x1,               deci );
+    Serial.print( posPend1,         deci );
     Serial.print( ", "                   );
-    Serial.print( x1Wrap,           deci );
+    Serial.print( posPend2,         deci );
     Serial.print( ", "                   );
-    Serial.print( x1_FIR,           deci );
+    Serial.print( posSled,          deci );
     Serial.print( ", "                   );
-    Serial.print( x2,               deci );
+    Serial.print( velPend1,         deci );
     Serial.print( ", "                   );
-    Serial.print( x2_FIR,           deci );
+    Serial.print( velPend2,         deci );
     Serial.print( ", "                   );
-    Serial.print( x3,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x3_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( x4,               deci );
-    Serial.print( ", "                   );
-    Serial.print( x4_FIR,           deci );
-    Serial.print( ", "                   );
-    Serial.print( setOutSledNoComp, deci );
-    Serial.print( ", "                   );
-    Serial.print( setOutSled,       deci );
-    Serial.print( ", "                   );
-    Serial.print( B_c_c,            deci );
+    Serial.print( velSled,          deci );
+//    Serial.print( x1,               deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x1Wrap,           deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x1_FIR,           deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x2,               deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x2_FIR,           deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x3,               deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x3_FIR,           deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x4,               deci );
+//    Serial.print( ", "                   );
+//    Serial.print( x4_FIR,           deci );
+//    Serial.print( ", "                   );
+//    Serial.print( setOutSledNoComp, deci );
+//    Serial.print( ", "                   );
+//    Serial.print( setOutSled,       deci );
+//    Serial.print( ", "                   );
+//    Serial.print( B_c_c,            deci );
   }
   else
   {
@@ -1068,9 +1085,13 @@ void printToTerminal( int   collectData, int   deci, float tSec,
     Serial.print( ", "           );
     Serial.print( posPend1, deci );
     Serial.print( ", "           );
+    Serial.print( posPend2, deci );
+    Serial.print( ", "           );
     Serial.print( posSled,  deci );
     Serial.print( ", "           );
     Serial.print( velPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( velPend2, deci );
     Serial.print( ", "           );
     Serial.print( velSled,  deci );
   }
