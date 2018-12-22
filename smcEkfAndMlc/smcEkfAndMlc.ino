@@ -200,6 +200,8 @@ int   offsetFIR_x4 = 0;               //
 float buffFIR_x3[5];              //<--here
 float buffFIR_x4[5];          //<--and here
 
+int logStop = 0;
+
 float t_last       = 0;
 float x1_last      = 0;
 float x2_last      = 0;
@@ -328,10 +330,6 @@ void loop()
       
       //reset EKF
       P_correction_EKF_not_empty_init();
-      
-      //tell python script to stop logging
-      Serial.print("\n");
-      Serial.print("stopLogging");
     }
     ///////Swing-Up and Sliding Mode///////////////////////
     else if( input == "1" )
@@ -401,6 +399,14 @@ void loop()
   Serial.print("\n");
   if( setOut == 0 )
   {
+    //tell python script to stop logging
+    if( logStop == 1 )
+    {
+      Serial.print("stopLogging");
+      Serial.print("\n");
+      logStop = 0;        //<--to only print once
+    }
+
     //time converted from micro sec to sec
     float tSec = float(float(time_stamp)/1000000);  // [s]
     
@@ -763,7 +769,7 @@ void loop()
     float tSec = float(float(time_stamp-time_now)/1000000);  // [s]
     
     int   testTime   = 20;    // [s]
-    float railOffset = 0.60;  //<--position on rail under test [m]
+    float railOffset = 0.05;  //<--position on rail under test [m]
     float railRange  = 0.002; //<--range margin [m] of movement 
                               //   on each side of railOffset
     //Note:
@@ -792,6 +798,7 @@ void loop()
       digitalWrite(ENABLESLED, LOW);
       if( velSled == 0 )
       {
+        logStop   = 1;
         setOut    = 0; //no longer moving, return to complete stop,
       }                //where logging is also stoped
     }
@@ -800,17 +807,15 @@ void loop()
     int collectData = 1;
     
     //choose nr of decimals printed after decimal point
-    int deci = 2;
+    int deci = 5;
 
-    float B_c_c = 0; //to use print function (otherwise not declared here)
-
-    //print mesurements depending on choice above
-    printToTerminal( collectData, deci,   tSec,
-                     x1,          x2,       x3,     x4,
-                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
-                     posPend1,    posPend2,         velPend1,   velPend2,
-                     posSled,     velSled                                );
+    Serial.print( tSec,             deci );
+    Serial.print( ", "                   );
+    Serial.print( setOutSled,       deci );
+    Serial.print( ", "                   );
+    Serial.print( posSled,          deci );
+    Serial.print( ", "                   );
+    Serial.print( velSled,          deci );
     //<<
   } //<<<<CART FRICTION AND MASS ESTIMATION <END<
     //<<
@@ -1044,16 +1049,18 @@ void printToTerminal( int   collectData, int   deci, float tSec,
     //printing for data collection
     Serial.print( tSec,             deci );
     Serial.print( ", "                   );
-    Serial.print( posPend1,         deci );
+    Serial.print( setOutSled,       deci );
     Serial.print( ", "                   );
-    Serial.print( posPend2,         deci );
-    Serial.print( ", "                   );
+    //Serial.print( posPend1,         deci );
+    //Serial.print( ", "                   );
+    //Serial.print( posPend2,         deci );
+    //Serial.print( ", "                   );
     Serial.print( posSled,          deci );
     Serial.print( ", "                   );
-    Serial.print( velPend1,         deci );
-    Serial.print( ", "                   );
-    Serial.print( velPend2,         deci );
-    Serial.print( ", "                   );
+    //Serial.print( velPend1,         deci );
+    //Serial.print( ", "                   );
+    //Serial.print( velPend2,         deci );
+    //Serial.print( ", "                   );
     Serial.print( velSled,          deci );
 //    Serial.print( x1,               deci );
 //    Serial.print( ", "                   );

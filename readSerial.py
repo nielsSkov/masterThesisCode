@@ -38,7 +38,7 @@ def testNameSelect():
     global logPathToFile
 
     testName      = input("Name of test for log filename: ")
-    pathFromHome  = '/thesis/matlab/testResults/data/swingUpAndCatch/'
+    pathFromHome  = '/thesis/matlab/parameterEstimation/data/cartTest3/'
     home          = str(Path.home())
     logPathToFile = home+pathFromHome+testName+'.csv'
 
