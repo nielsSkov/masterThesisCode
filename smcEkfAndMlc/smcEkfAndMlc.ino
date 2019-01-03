@@ -362,6 +362,14 @@ void loop()
       Serial.print("\n");
       Serial.print("startLogging");      
     }
+    ///////Kalman Filter Test////////////
+    else if( input == "8" )
+    {
+      setOut = 8;
+      time_now = micros();
+      Serial.print("\n");
+      Serial.print("startLogging");
+    }
     ///////Reset Variables/////////////////////////////////
     else if( input == "r" )
     {
@@ -606,11 +614,11 @@ void loop()
     else                  { sgnCart =  0; }
     //
     //                             vel away from ceneter
-    if( (abs(posSled-.38) > .08 && sgnCart*velSled > 1) )
+    if( abs(posSled-.38) > .08 && sgnCart*velSled > 1 )
     {
       Serial.println("Secure Edge Active");
       
-      setOutSled = -sgnCart*5; //<--breaking cart runs away
+      setOutSled = -sgnCart*5; //<--breaking if cart runs away
     }
     /////////////////////////////////////////////////////////
     ///////CATCH - SLIDING MODE//////////////////////////////
@@ -898,6 +906,260 @@ void loop()
   } //<<<<FRICTION COMPENSATION ONLY <END<
     //<<
     //  
+  /////////////////////////////////////////////////////////
+  ///////KALMAN FILTER TEST////////////////////////////////
+  /////////////////////////////////////////////////////////
+  else if( setOut == 8 )
+  {
+    digitalWrite(ENABLESLED, HIGH);
+    setOutPend1 = 0;
+    setOutSled  = 0;
+    
+    float tSec   = float(float(time_stamp-time_now)/1000000);  // [s]
+    
+    int testTime = 20;    // [s]
+    
+    //-------initialize Kalman variables-------------------
+    
+    float xEstK[6][1] = { 0 };
+    float    Pk[6][6] = { 0 };
+    bool  firstRunK   = true;  //!!!!!!!!!!!!!
+ 
+    //>>
+    //>>>>---initialization--------------------------------
+    //>>
+
+    float Q[6][6]  = {0};
+
+    //setting diagonal elements of Q
+    Q[0][0] = 1; Q[1][1] = 1; Q[2][2] = 1;
+    Q[3][3] = 1; Q[4][4] = 1; Q[5][5] = 1; 
+
+    //introducing shorthand for scientific e-notation
+    float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
+    float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
+
+    float R[3][3] = { {  7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10 },
+                      {  1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9  },
+                      { -3.5968*eN10, -3.1029*eN9,  1.0616*eN9  } };
+    
+    if( firstRunK )
+    {
+      //initialize estimated states
+      xEstK[5][0] = { posPend1, posPend2, posSled, 0, 0, 0 };
+    
+      firstRunK = false;
+    }
+
+    float y[3][1] = { posPend1, posPend2, posSled };
+   
+    //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
+    float A[6][6] = 
+      { { 1.0007    , 2.7512*eN5, 0  0.0066677 , -1.6497*eN7, 0       },
+        { 3.8817*eN5, 1.0011    , 0 -1.2727*eN7,  0.0066632 , 0       },
+        { 7.7711*eN6, 8.7217*eN6, 1 -2.5479*eN8, -5.2298*eN8, 0.00667 },
+        { 0.21397   , 0.0082496 , 0  0.9993    , -4.9467*eN5, 0       },
+        { 0.011639  , 0.34024   , 0 -3.8162*eN5,  0.99796   , 0       },
+        { 0.0023302 , 0.0026152 , 0 -7.64  *eN6, -1.5681*eN5, 1       } };
+    //
+    float B[6][1] = { 1.1173*eN5, 1.7692*eN5, 3.5419*eN6, 
+                      0.0033502,  0.005305,   0.001062   };
+    //
+    float C[3][6] =
+      { {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 },
+        { 1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 },
+        { 3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335 } };
+    
+    //>>
+    //>>>>---prediction------------------------------------
+    //>>
+
+    /////////////////////////////////////
+    //>> xPred = A*xEstK + B*u_last  <<//
+    /////////////////////////////////////
+
+    //>> A*xEstK
+    float A_X_xEstK[6][1] = { 0 };
+    //
+    matrixMult( A_X_xEstK, A, xEstK,  6, 6, 6, 1 );
+    
+    //>> B*u_last
+    float B_X_u[6][1] = { 0 };
+    //
+    matrixMult( B_X_uLast, B, u_last, 6, 1, 1, 1 );
+    
+    //>> xPred = A*xEstK + B*u_last
+    float xPred[6][1] = { 0 };
+    //
+    matrixAdd( xPred, false, A_X_xEstK, B_X_uLast, 6, 1, 6, 1 );
+
+    ///////////////////////////
+    //>> Pk = A*Pk*A' + Q  <<//
+    ///////////////////////////
+    
+    //>> A*Pk
+    float A_X_Pk[6][6] = { 0 };
+    //
+    matrixMult( A_X_Pk, A, Pk, 6, 6, 6, 6 );
+    
+    //>> A'
+    float AT[6][6] = { 0 };
+    //
+    matrixTranspose( AT, A, 6, 6 );
+    
+    //>> A*Pk*A'
+    float A_X_Pk_X_AT[6][6] = { 0 };
+    //
+    matrixMult( A_X_Pk_X_AT, A_X_Pk, AT, 6, 6, 6, 6 );
+    
+    //>> Pk = A*Pk*A' + Q
+    matrixAdd( Pk, false, A_X_Pk_X_AT, Q, 6, 6, 6, 6 );
+    //old Pk was overwritten
+    
+    //>>
+    //>>>>---update----------------------------------------
+    //>>
+
+    //////////////////////////////////////
+    //>> K = Pk*C'*inv( C*Pk*C' + R ) <<//
+    //////////////////////////////////////
+    
+    //>> C'
+    float CT[6][3] = { 0 };
+    //
+    matrixTranspose( CT, C, 3, 6 );
+    
+    //>> Pk*C'
+    float Pk_X_CT[6][3] = { 0 };
+    //
+    matrixMult( Pk_X_CT, Pk, CT, 6, 6, 6, 3 );
+    
+    //>> C*Pk
+    float C_X_Pk[3][6] = { 0 };
+    //
+    matrixMult( C_X_Pk, C, Pk, 3, 6, 6, 6 );
+    
+    //>> C*Pk*C'
+    float C_X_Pk_X_CT[3][3] = { 0 };
+    //
+    matrixMult( C_X_Pk_X_CT, C_X_Pk, CT, 3, 6, 6, 3 );
+    
+    //>> C*Pk*C' + R
+    float C_X_Pk_X_CT_ADD_R[3][3] = { 0 }
+    //
+    matrixAdd( C_X_Pk_X_CT_ADD_R, false, C_X_Pk_X_CT, R, 3, 3, 3, 3 );
+    
+    //>> inv( C*Pk*C' + R )
+    float inv_C_X_Pk_X_CT_ADD_R[3][3] = { 0 }
+    //
+    inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R )
+    
+    //>> K = Pk*C'*inv( C*Pk*C' + R )
+    float K[6][3]  = { 0 };
+    //
+    matrixMult( K, Pk_X_CT, inv_C_X_Pk_X_CT_ADD_R, 6, 3, 3, 3 );
+    
+    ///////////////////////////////////////
+    //>> xEstK = xPred + K*(y - C*xPred) <<//
+    ///////////////////////////////////////
+    
+    //>> C*xPred
+    float C_X_xPred[3][1] = { 0 };
+    //
+    matrixMult( C_X_xPred, C, xPred, 3, 6, 6, 1 );
+    
+    //>> (y - C*xPred)
+    float y_SUB_C_X_xPred[3][1] = { 0 };
+    //
+    matrixAdd( y_SUB_C_X_xPred, true, y, C_X_xPred, 3, 1, 3, 1 );
+    
+    //>> K*(y - C*xPred)
+    float K_X_y_SUB_C_X_xPred[6][1] = { 0 };
+    //
+    matrixMult( K_X_y_SUB_C_X_xPred, K, y_SUB_C_X_xPred, 6, 3, 3, 1 );
+    
+    //>> xEstK = xPred + K*(y - C*xPred)
+    matrixAdd( xEstK, false, xPred, K_X_y_SUB_C_X_xPred, 6, 6, 6, 6 );
+    //xEstK was updated
+    
+    ////////////////////////
+    //>> Pk = I - K*C*Pk <<//
+    ////////////////////////
+    
+    //>> I
+    float I[6][6]  = {0};
+    I[0][0] = I[1][1] = I[2][2] = I[3][3] = I[4][4] = I[5][5] = 1; 
+    
+    //>> K*C
+    float K_X_C[6][6] = { 0 };
+    //
+    matrixMult( K_X_C, K, C, 6, 3, 3, 6 );
+    
+    //>> K*C*Pk
+    float K_X_C_X_Pk[6][6] = { 0 };
+    //
+    matrixMult( K_X_C_X_Pk, K_X_C, Pk, 6, 6, 6, 6 );
+    
+    //>> Pk = I - K*C*Pk
+    float P[6][6] = { 0 };
+    //
+    matrixAdd( Pk, true, I, K_X_C_X_Pk, 6, 6, 6, 6 );
+    //Pk was updated
+    
+    //>>
+    //>>>>---Kalman filter end-----------------------------
+    //>>
+    
+    //store Kalman variables using reduced notation
+    float x1_K = xEstK[0];
+    float x2_K = xEstK[1];
+    float x3_K = xEstK[2];
+    float x4_K = xEstK[3];
+    float x5_K = xEstK[4];
+    float x6_K = xEstK[5];
+    
+    if( tSec > testTime )
+    {
+      digitalWrite(ENABLESLED, LOW);
+      if( velSled == 0 )
+      {
+        logStop   = 1;
+        setOut    = 0; //stop logging
+      }
+    }
+    
+    //choose nr of decimals printed after decimal point
+    int deci = 5;
+
+    //output for logging
+    Serial.print( tSec,     deci );
+    Serial.print( ", "           );
+    Serial.print( posPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( posPend2, deci );
+    Serial.print( ", "           );
+    Serial.print( posSled,  deci );
+    Serial.print( ", "           );
+    Serial.print( velPend1, deci );
+    Serial.print( ", "           );
+    Serial.print( velPend2, deci );
+    Serial.print( ", "           );
+    Serial.print( velSled,  deci );
+    Serial.print( ", "           );
+    Serial.print( x1_K,     deci );
+    Serial.print( ", "           );
+    Serial.print( x2_K,     deci );
+    Serial.print( ", "           );
+    Serial.print( x3_K,     deci );
+    Serial.print( ", "           );
+    Serial.print( x4_K,     deci );
+    Serial.print( ", "           );
+    Serial.print( x5_K,     deci );
+    Serial.print( ", "           );
+    Serial.print( x6_K,     deci );
+    //<<
+  } //<<<<KALMAN FILTER TEST <END<
+    //<<
   
   //////////////////////////////////////////////////////////
   ///////SET OUTPUTS////////////////////////////////////////
@@ -926,12 +1188,95 @@ void loop()
   //<<
 
 
+void inv3x3Matrix( float * invM[][], float m[][] )
+{
+  float det  = m[0][0] * (m[1][1]*m[2][2] - m[1][2] * m[2][1]);
+        det -= m[0][1] * (m[1][0]*m[2][2] - m[1][2] * m[2][0]);
+        det += m[0][2] * (m[1][0]*m[2][1] - m[1][1] * m[2][0]);
 
+  float invDet = 1.0 / (det);
 
+  invM[0][0] = (invDet) * (m[1][1] * m[2][2] - m[1][2] * m[2][1]);
+  invM[1][0] = (invDet) * (m[1][2] * m[2][0] - m[1][0] * m[2][2]);
+  invM[2][0] = (invDet) * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 
+  invM[0][1] = (invDet) * (m[0][2] * m[2][1] - m[0][1] * m[2][2]);
+  invM[1][1] = (invDet) * (m[0][0] * m[2][2] - m[0][2] * m[2][0]);
+  invM[2][1] = (invDet) * (m[0][1] * m[2][0] - m[0][0] * m[2][1]);
 
+  invM[0][2] = (invDet) * (m[0][1] * m[1][2] - m[0][2] * m[1][1]);
+  invM[1][2] = (invDet) * (m[0][2] * m[1][0] - m[0][0] * m[1][2]);
+  invM[2][2] = (invDet) * (m[0][0] * m[1][1] - m[0][1] * m[1][0]);
+}
 
+void matrixTranspose( float * matrixT[][], float matrix[][],
+                                           int rows, int cols ) 
+{
+  int i, j;
+  for (   i = 0; i < rows; i++ )
+  { 
+    for ( j = 0; j < cols; j++ ) 
+      matrixT[i][j] = matrix[j][i]; 
+  }
+}
 
+void matrixAdd( float * add[][], bool substract,
+                float   matrix1[][],      float matrix2[][],
+                int     rows1, int cols1, int rows2, int cols2 )
+{
+  int i, j;
+
+  //check if matrix dimentions match, if not: exit subroutine
+  if( cols1 ~= cols2 || rows1 ~= rows2 )
+  {
+    Serial.print( "matrixAdd: Matrix Dimention Mismatch!" );
+    logStop = 1;
+    setOut  = 0; //stop logging
+  }
+
+  for(   i = 0; i < rows1; ++i )
+  {
+    for( j = 0; j < cols1; ++j )
+    {
+      if substract
+      {
+        add[i][j] = matrix1[i][j] - matrix2[i][j];
+      }
+      else
+      {
+        add[i][j] = matrix1[i][j] + matrix2[i][j];
+      }
+    }
+  }
+}
+
+void matrixMult( float * mult[][],
+                 float   matrix1[][],      float matrix2[][],
+                 int     rows1, int cols1, int rows2, int cols2 )
+{
+  int i, j, k;
+
+  //check if matrix dimentions match, if not: exit subroutine
+  if( cols1 ~= rows2 )
+  {
+    Serial.print( "matrixMult: Matrix Dimention Mismatch!" );
+    logStop = 1;
+    setOut  = 0; //stop logging
+  }
+
+  for(     i = 0; i < rows1; ++i )
+  {
+    for(   j = 0; j < cols2; ++j )
+    {
+      mult[i][j] = 0;
+      
+      for( k = 0; k < cols1; ++k )
+      {
+        mult[i][j] += matrix1[i][k]*matrix2[k][j];
+      }
+    }
+  }
+}
 
 //linear interpolation function for friction lookup
 float interpolate(float z0, float y0, float z1, float y1, float z)
