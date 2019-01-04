@@ -234,6 +234,14 @@ double x_init[4];
 float  setOutSledNoComp = 0;
 bool   first_run        = true;
 
+
+//-------initialize Kalman variables-------------------
+
+float xEstK[6][1] = { 0 };
+float    Pk[6][6] = { 0 };
+bool  firstRunK   = true;
+ 
+
 ///////////////////////////////////////////////////////////
 ///////SYSTEM SETUP////////////////////////////////////////
 ///////////////////////////////////////////////////////////
@@ -330,6 +338,9 @@ void loop()
       
       //reset EKF
       P_correction_EKF_not_empty_init();
+    
+      //reset Kalman
+      firstRunK = true;
     }
     ///////Swing-Up and Sliding Mode///////////////////////
     else if( input == "1" )
@@ -919,34 +930,41 @@ void loop()
     
     int testTime = 20;    // [s]
     
-    //-------initialize Kalman variables-------------------
-    
-    float xEstK[6][1] = { 0 };
-    float    Pk[6][6] = { 0 };
-    bool  firstRunK   = true;  //!!!!!!!!!!!!!
- 
     //>>
     //>>>>---initialization--------------------------------
     //>>
 
-    float Q[6][6]  = {0};
-
+    // matrix array interpretation
+    // [ row *cols+ col ] = [ row ][ col ]
+    
+    //variables for matrix sizes
+    int c1 = 6, r1 = 6, c2 = 0, r2 = 0;
+    // 
+    float Q[c1*r1]  = {0};
+    //
     //setting diagonal elements of Q
-    Q[0][0] = 1; Q[1][1] = 1; Q[2][2] = 1;
-    Q[3][3] = 1; Q[4][4] = 1; Q[5][5] = 1; 
+    Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1;
+    Q[3 *c1+ 3] = 1; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = 1; 
 
     //introducing shorthand for scientific e-notation
     float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
     float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
 
-    float R[3][3] = { {  7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10 },
-                      {  1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9  },
-                      { -3.5968*eN10, -3.1029*eN9,  1.0616*eN9  } };
+    c1 = 3, r1 = 3;
+    float R[c1*r1] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
+                       1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
+                      -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
     
     if( firstRunK )
     {
       //initialize estimated states
-      xEstK[5][0] = { posPend1, posPend2, posSled, 0, 0, 0 };
+      r1 = 6; c1 = 1;
+      xEstK[0 *c1+ 0] = posPend1;
+      xEstK[1 *c1+ 0] = posPend2;
+      xEstK[2 *c1+ 0] = posSled;
+      xEstK[3 *c1+ 0] = 0;
+      xEstK[4 *c1+ 0] = 0;
+      xEstK[5 *c1+ 0] = 0;
     
       firstRunK = false;
     }
@@ -954,13 +972,13 @@ void loop()
     float y[3][1] = { posPend1, posPend2, posSled };
    
     //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
-    float A[6][6] = 
-      { { 1.0007    , 2.7512*eN5, 0  0.0066677 , -1.6497*eN7, 0       },
-        { 3.8817*eN5, 1.0011    , 0 -1.2727*eN7,  0.0066632 , 0       },
-        { 7.7711*eN6, 8.7217*eN6, 1 -2.5479*eN8, -5.2298*eN8, 0.00667 },
-        { 0.21397   , 0.0082496 , 0  0.9993    , -4.9467*eN5, 0       },
-        { 0.011639  , 0.34024   , 0 -3.8162*eN5,  0.99796   , 0       },
-        { 0.0023302 , 0.0026152 , 0 -7.64  *eN6, -1.5681*eN5, 1       } };
+    float A[rows1*cols1] = 
+      { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
+        3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
+        7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
+        0.21397   , 0.0082496 , 0,  0.9993    , -4.9467*eN5, 0       ,
+        0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
+        0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
     //
     float B[6][1] = { 1.1173*eN5, 1.7692*eN5, 3.5419*eN6, 
                       0.0033502,  0.005305,   0.001062   };
@@ -984,7 +1002,7 @@ void loop()
     matrixMult( A_X_xEstK, A, xEstK,  6, 6, 6, 1 );
     
     //>> B*u_last
-    float B_X_u[6][1] = { 0 };
+    float B_X_uLast[6][1] = { 0 };
     //
     matrixMult( B_X_uLast, B, u_last, 6, 1, 1, 1 );
     
@@ -1003,9 +1021,10 @@ void loop()
     matrixMult( A_X_Pk, A, Pk, 6, 6, 6, 6 );
     
     //>> A'
-    float AT[6][6] = { 0 };
+    cols1 = 6; rows1 = 6;
+    float AT[rows1*cols1] = { 0 };
     //
-    matrixTranspose( AT, A, 6, 6 );
+    matrixTranspose( AT, A, rows1, cols1 );
     
     //>> A*Pk*A'
     float A_X_Pk_X_AT[6][6] = { 0 };
@@ -1045,14 +1064,14 @@ void loop()
     matrixMult( C_X_Pk_X_CT, C_X_Pk, CT, 3, 6, 6, 3 );
     
     //>> C*Pk*C' + R
-    float C_X_Pk_X_CT_ADD_R[3][3] = { 0 }
+    float C_X_Pk_X_CT_ADD_R[3][3] = { 0 };
     //
     matrixAdd( C_X_Pk_X_CT_ADD_R, false, C_X_Pk_X_CT, R, 3, 3, 3, 3 );
     
     //>> inv( C*Pk*C' + R )
-    float inv_C_X_Pk_X_CT_ADD_R[3][3] = { 0 }
+    float inv_C_X_Pk_X_CT_ADD_R[3][3] = { 0 };
     //
-    inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R )
+    inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R );
     
     //>> K = Pk*C'*inv( C*Pk*C' + R )
     float K[6][3]  = { 0 };
@@ -1111,12 +1130,12 @@ void loop()
     //>>
     
     //store Kalman variables using reduced notation
-    float x1_K = xEstK[0];
-    float x2_K = xEstK[1];
-    float x3_K = xEstK[2];
-    float x4_K = xEstK[3];
-    float x5_K = xEstK[4];
-    float x6_K = xEstK[5];
+    float x1_K = xEstK[0][0];
+    float x2_K = xEstK[1][0];
+    float x3_K = xEstK[2][0];
+    float x4_K = xEstK[3][0];
+    float x5_K = xEstK[4][0];
+    float x6_K = xEstK[5][0];
     
     if( tSec > testTime )
     {
@@ -1188,7 +1207,7 @@ void loop()
   //<<
 
 
-void inv3x3Matrix( float * invM[][], float m[][] )
+void inv3x3Matrix( float * invM[3][3], float m[3][3] )
 {
   float det  = m[0][0] * (m[1][1]*m[2][2] - m[1][2] * m[2][1]);
         det -= m[0][1] * (m[1][0]*m[2][2] - m[1][2] * m[2][0]);
@@ -1209,14 +1228,16 @@ void inv3x3Matrix( float * invM[][], float m[][] )
   invM[2][2] = (invDet) * (m[0][0] * m[1][1] - m[0][1] * m[1][0]);
 }
 
-void matrixTranspose( float * matrixT[][], float matrix[][],
-                                           int rows, int cols ) 
+// [ row*cols + col ] = [ row ][ col ]
+
+void matrixTranspose( float matrixT[], float matrix[],
+                                       int rows, int cols ) 
 {
   int i, j;
   for (   i = 0; i < rows; i++ )
   { 
-    for ( j = 0; j < cols; j++ ) 
-      matrixT[i][j] = matrix[j][i]; 
+    for ( j = 0; j < cols; j++ )
+      matrixT[i *cols+ j] = matrix[j *rows+ i]; 
   }
 }
 
