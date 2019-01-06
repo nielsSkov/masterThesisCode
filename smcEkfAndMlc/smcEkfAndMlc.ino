@@ -179,26 +179,27 @@ float coloumbN[] =
 ///////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////
 
-// Create joint objects
+//create joint objects
 Joint  sled( 1, SAMPLINGTIME );
 Joint pend1( 2, SAMPLINGTIME );
 Joint pend2( 3, SAMPLINGTIME );
-
 
 struct firStru
 {
   float xIn;         //   set window size here
   float buff[5];     //<--must be same size as
   int   offset;                               //
-};                                             //
-                                                //
+};                                              //
+                                                 //
 ///////Global Variables////////////////////////////////////
-                                               //
-//ring-buffer and offset for FIR filter     //
-int   offsetFIR_x3 = 0;                  //
-int   offsetFIR_x4 = 0;               //
+                                                 //
+//ring-buffer and offset for FIR filter        //
+int   offsetFIR_x3 = 0;                     //
+int   offsetFIR_x4 = 0;                  //
+int   offsetFIR_p2 = 0;               //
 float buffFIR_x3[5];              //<--here
-float buffFIR_x4[5];          //<--and here
+float buffFIR_x4[5];          //<--here
+float buffFIR_p2[5];      //<--and here
 
 int logStop = 0;
 
@@ -207,38 +208,43 @@ float x1_last      = 0;
 float x2_last      = 0;
 float x3_last      = 0;
 float x4_last      = 0;
+float p2_last      = 0;
+float p2_FIR_last  = 0;
 
 float setOutSled   = 0;
 float setOutPend1  = 0;
+
 float velSled      = 0;
 float velPend1     = 0;
 float velPend2     = 0;
-float posSled;
-float posPend1;
-float posPend2;
+float posSled      = 0;
+float posPend1     = 0;
+float posPend2     = 0;
+
 int   setOut       = 0;
 
-float u_last       = 0;
-float x1_old       = 0;
+float u_last       = 0;    //used by Kalman and swing so far
 float catchAngle   = 0.02;
-int   slideOn      = 0;
+int   slideOn      = false;
+
+bool twinActive      = false;
+bool twinCatch       = false;
+float catchAngleTwin = 0.1;
 
 unsigned long current_time = 0;
 unsigned long last_time    = 0;
 unsigned long loop_time    = 0;
 unsigned long time_now     = 0;
 
-// For initializing the EKF
+//for EKF initialization
 double x_est_correction[4];
 double x_init[4];
 float  setOutSledNoComp = 0;
 bool   first_run        = true;
 
-
-//-------initialize Kalman variables-------------------
-
-float xEstK[6][1] = { 0 };
-float    Pk[6][6] = { 0 };
+//for Kalman initialization
+float xEstK[6*1] = { 0 };
+float    Pk[6*6] = { 0 };
 bool  firstRunK   = true;
  
 
@@ -303,25 +309,50 @@ void setup()
 
 void loop()
 {
-  ///////MODEL PARAMETERS////////////////////////////////////
-  float r_pulley  = 0.028;
-  float K_t       = 0.0934;
-  float l         = 0.3348;      //0.3235;
-  float m_b       = 0.201;
-  float g         = 9.82;
-  float k_tanh    = 250;
+  ///////MODEL PARAMETERS////////////////////////////////////////////////////////////
+  //
+  //                         addjustment from
+  //         measured            estimate
+  float m1 = .100+.075+.026      +.02250;  // mass of pendulum 1          [kg]
+  float l1 = .3235               -.00658;  // length of pendulum 1        [m]
+  //
+  //                          addjustment from
+  //          measured            estimate
+  float m2 = .100+.075+.026+.05  +.0132;   // mass of pendulum 2          [kg]
+  float l2 = .2                  -.0000;   // length of pendulum 2        [m]
+  //
+  //         estimated
+  float M  = 6.28;                         // mass of cart                [kg]
+  //
+  //         gravity in Denmark
+  float g  = 9.82;                         // gravitational acceleration  [m s^-2]
+  //
+  //         measured
+  float r  = 0.028;                        // radius of pulley            [m]
+  //
+  //
+  float b_c_v  = 0;                        // cart viscous friction       [N m^-1 s]
+  //
+  //             estimated
+  float b_p1_c = .0041;                    // pendulum 1 coulomb friction [N m]
+  float b_p1_v = .0005;                    // pendulum 1 viscous friction [N m s]
+  //
+  //             estimated
+  float b_p2_c = .0057;                    // pendulum 2 coulomb friction [N m]
+  float b_p2_v = .0001;                    // pendulum 2 viscous friction [N m s]
+  //
+  //             for steap slope of tanh
+  float k_tanh = 250;                      //tanh constant                [1]
+  //
+  //             from datasheet
+  float k_tau  = .0934;                    // motor torque constant       [N m A^-1]
 
-  //cart friction and mass
-  float m_c       =  6.280;
-  float B_v_c     = 10.414;
-  //float B_c_pos  = 3.0212 - 0.5;
-  //float B_c_neg  = 2.7464;
-  //float B_v_pos  = 1.936;
-  //float B_v_neg  = 1.422;
-
-  //pendulum frictions
-  float B_v_p    = 0.0004;
-  float F_c_p    = 0.004;
+  //notation for cart pendulum (system with only one pendulum)
+  //
+  float l     = l1;     // .3348;
+  float m     = m1;     // .2010;
+  float b_p_c = b_p1_c; // .004;
+  float b_p_v = b_p1_v; // .0004;
   
   /////////////////////////////////////////////////////////
   //////SERIAL INTERFACE///////////////////////////////////
@@ -346,6 +377,14 @@ void loop()
     else if( input == "1" )
     {
       setOut = 1;
+      time_now = micros();
+      Serial.print("\n");
+      Serial.print("startLogging");      
+    }
+    ///////Swing-Up and Catch Twin/////////////////////////
+    else if( input == "2" )
+    {
+      setOut = 2;
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");      
@@ -456,11 +495,13 @@ void loop()
   //mesurements used in FIR filters
   float x1_FIR = posPend1;
   float x2_FIR = posSled-0.38; //<--rail center as zero
+  float p2     = posPend2;
   
   //nummerical diff for FIR filters
   float x3_FIR = (x1_FIR - x1_last)/t_delta;
   float x4_FIR = (x2_FIR - x2_last)/t_delta;
-  
+  float p2_FIR = (p2     - p2_last)/t_delta;  
+
   //set window size for all FIR filters
   float  N_FIR = (sizeof(buffFIR_x3)/sizeof(buffFIR_x3[0]));  //<--same size as for x4
   
@@ -475,7 +516,7 @@ void loop()
   ///////FIR (MA) FILTERS//////////////////////////////////
   /////////////////////////////////////////////////////////
 
-  //struct for FIR (MA) filter of x3 (angle velocity)
+  //struct for FIR (MA) filter of x3 (p1 angle velocity)
   struct firStru sx3 =
   {
     x3_FIR,
@@ -491,6 +532,8 @@ void loop()
           x3_FIR       = sx3.xIn;
           offsetFIR_x3 = sx3.offset;
   memcpy( buffFIR_x3,    sx3.buff,   sizeof(buffFIR_x3) );
+
+  //-------------------------------------------------------
 
   //struct for FIR (MA) filter of x4 (cart velocity)
   struct firStru sx4 =
@@ -509,6 +552,25 @@ void loop()
           offsetFIR_x4 = sx4.offset;
   memcpy( buffFIR_x4,    sx4.buff,   sizeof(buffFIR_x4) );
 
+  //-------------------------------------------------------
+
+  //struct for FIR (MA) filter of p2 angle velocity
+  struct firStru sp2 =
+  {
+    p2_FIR,
+    { 0 },
+    offsetFIR_p2
+  };
+  memcpy( sp2.buff, buffFIR_p2, sizeof(buffFIR_p2) );
+  
+  //calculate angular velocity through FIR (MA) filter
+  sp2 = FIR( sp2, h, (int)N_FIR );
+
+  //assigning output of filter
+          p2_FIR       = sp2.xIn;
+          offsetFIR_p2 = sp2.offset;
+  memcpy( buffFIR_p2,    sp2.buff,   sizeof(buffFIR_p2) );
+
   /////////////////////////////////////////////////////////
   ///////EXPONENTIAL SMOOTHING FILTER//////////////////////
   /////////////////////////////////////////////////////////
@@ -516,58 +578,94 @@ void loop()
   float alpha = .8;
   x3_FIR      = alpha*x3_FIR + ( 1 - alpha )*x3_last;
   x4_FIR      = alpha*x4_FIR + ( 1 - alpha )*x4_last;
+  p2_FIR      = alpha*p2_FIR + ( 1 - alpha )*p2_FIR_last;
   
-  x1_last = x1_FIR;
-  x2_last = x2_FIR;
-  x3_last = x3_FIR;
-  x4_last = x4_FIR;
-  t_last  = time_stamp;
-
-  ///////INITIALIZE AND UPDATE EKF///////////////////////
-  double y_meas[2];
-  y_meas[0] = posSled;
-  y_meas[1] = posPend1;
-
-  if( first_run )
+  x1_last     = x1_FIR;
+  x2_last     = x2_FIR;
+  x3_last     = x3_FIR;
+  x4_last     = x4_FIR;
+  p2_last     = p2;
+  p2_FIR_last = p2_FIR;
+  t_last      = time_stamp;
+  
+  //choose states depending on which system (twin or not) is active
+  if( twinActive )
   {
-    x_init[0] = posSled;
-    x_init[1] = posPend1;
-    x_init[2] = 0;
-    x_init[3] = 0;
-    first_run = false;
+    if( twinCatch )
+    {
+    ///////KALMAN FILTER
+    }
+    else //if swing-up twin
+    {
+      //change coordinate convention
+      x1 = x1_FIR; //theta1
+      x2 = p2;     //theta2
+      x3 = x2_FIR; //x
+      x4 = x3_FIR; //theta1_dot
+      x5 = p2_FIR; //theta2_dot
+      x6 = x4_FIR; //x_dot
+    }
+    current_x     = x3;  //x
+    current_x_dot = x6;  //x_dot
+    
+    //creating wrapped vertion of theta1 for catch
+    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+    if( x1Wrap < 0 )
+    {
+      x1Wrap = float(x1Wrap + float(2*PI));
+    }
+    x1Wrap = float(x1Wrap - PI);
+    
+    //creating wrapped vertion of theta2 for catch
+    float x2Wrap = float(fmod( float(x2 + PI), float(2*PI) ));
+    if( x2Wrap < 0 )
+    {
+      x2Wrap = float(x2Wrap + float(2*PI));
+    }
+    x2Wrap = float(x2Wrap - PI);
   }
-
-  EKF(y_meas, setOutSledNoComp, SAMPLINGTIME, x_init, x_est_correction);
-
-  //change coordinate convention
-  float x1 = x_est_correction[1];
-  float x2 = x_est_correction[0]-0.38; //<--rail center as zero
-  float x3 = x_est_correction[3];
-  float x4 = x_est_correction[2];
-  
-  //update currently used variables if filter is in use
-  float current_x1;
-  float current_x2;
-  float current_x3; 
-  float current_x4;
-  //
-  if(      slideOn == 1 ){ current_x1 = x1;
-                           current_x2 = x2;
-                           current_x3 = x3;
-                           current_x4 = x4;     }
-  else if( slideOn == 0 ){ current_x1 = x1_FIR;
-                           current_x2 = x2_FIR;
-                           current_x3 = x3_FIR;
-                           current_x4 = x4_FIR; }
-
-  //creating wrapped vertion of angle for sliding mode
-  float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
-  if( x1Wrap < 0 )
+  else
   {
-    x1Wrap = float(x1Wrap + float(2*PI));
-  }
-  x1Wrap = float(x1Wrap - PI);
-  
+    ///////INITIALIZE AND UPDATE EKF///////////////////////
+    double y_meas[2];
+    y_meas[0] = posSled;
+    y_meas[1] = posPend1;
+
+    if( first_run )
+    {
+      x_init[0] = posSled;
+      x_init[1] = posPend1;
+      x_init[2] = 0;
+      x_init[3] = 0;
+      first_run = false;
+    }
+
+    EKF(y_meas, setOutSledNoComp, SAMPLINGTIME, x_init, x_est_correction);
+    
+    //change coordinate convention
+    float x1 = x_est_correction[1];
+    float x2 = x_est_correction[0]-0.38; //<--rail center as zero
+    float x3 = x_est_correction[3];
+    float x4 = x_est_correction[2];
+    
+    //update currently used variables if filter is in use
+    float current_x;
+    float current_x_dot;
+    //
+    if( slideOn ){ current_x     = x2;       //x
+                   current_x_dot = x4;     } //x_dot
+    else         { current_x     = x2_FIR;   //x
+                   current_x_dot = x4_FIR; } //x_dot
+
+    //creating wrapped vertion of angle for sliding mode
+    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+    if( x1Wrap < 0 )
+    {
+      x1Wrap = float(x1Wrap + float(2*PI));
+    }
+    x1Wrap = float(x1Wrap - PI);
+  }  
+
   /////////////////////////////////////////////////////////
   ///////STOP ALL//////////////////////////////////////////
   /////////////////////////////////////////////////////////
@@ -612,8 +710,8 @@ void loop()
     setOutSled = 0;
     float u    = 0;
 
-    float B_c_c = estimateCartFriction( position,   coloumbP,   coloumbN,
-                                        current_x2, current_x4, setOutSled );
+    float b_c_c = estimateCartFriction( position,  coloumbP,      coloumbN,
+                                        current_x, current_x_dot, setOutSled );
     
     /////////////////////////////////////////////////////////
     //////EDGE OF RAIL SECURITY//////////////////////////////
@@ -624,8 +722,8 @@ void loop()
     else if( sgnCart < 0 ){ sgnCart = -1; }
     else                  { sgnCart =  0; }
     //
-    //                             vel away from ceneter
-    if( abs(posSled-.38) > .08 && sgnCart*velSled > 1 )
+    //  cart is close to edge   &&  velocity away from center is large
+    if( abs(posSled-.38) > .08  &&  sgnCart*velSled > 1 )
     {
       Serial.println("Secure Edge Active");
       
@@ -637,13 +735,13 @@ void loop()
     //
     else if( abs(x1Wrap) < catchAngle )
     {
-      slideOn = 1;
+      slideOn = true;
 
       //set wider catch angle to stay in sliding mode after wing-up sequence 
       catchAngle = 0.2;
       
       //inverse of function on output
-      float g_b_inv = m_c + m_b - m_b*cos(x1Wrap)*cos(x1Wrap);
+      float g_b_inv = M + m - m*cos(x1Wrap)*cos(x1Wrap);
       
       //sliding manifold
       float s = x4 - k2*(x3 - (x4*cos(x1Wrap))/l) + k1*x1Wrap + k3*x2;
@@ -663,7 +761,7 @@ void loop()
       float u = - satS*beta*g_b_inv;// + lin_u;
       
       //calculating required current to obtain control, u
-      setOutSled = u*r_pulley/K_t;
+      setOutSled = u*r/k_tau;
 
       //option to set current limit peak
       if(0)
@@ -689,7 +787,7 @@ void loop()
     /////////////////////////////////////////////////////////
     else //if(0)
     {
-      slideOn = 0;
+      slideOn = false;
       
       //set narrow catch angle to provide
       //best handover to sliding mode
@@ -707,14 +805,14 @@ void loop()
       
       //calculate maximum acceleration of cart
       float i_max = 4.58+.5;
-      float u_max = i_max*K_t/r_pulley;
-      float a_max = u_max/(m_c+m_b);
+      float u_max = i_max*k_tau/r;
+      float a_max = u_max/(M + m);
       
       //extra energy offset from equilibrium to get fast catch
       float E_off = -.03; // -.007;
       
       //energy error
-      float E_delta = .5*m_b*l*l*x3*x3 + m_b*g*l*(cos(x1_FIR) - 1) + E_off;
+      float E_delta = .5*m*l*l*x3*x3 + m*g*l*(cos(x1_FIR) - 1) + E_off;
       
       //energy control law (acceleration of cart)
       float a_c = -k*E_delta*sgn;
@@ -724,7 +822,7 @@ void loop()
       else if( a_c < -a_max ){ a_c = -a_max; } //a_c = a_c otherwise
       
       //estimation of needed actuation to achieve cart acceleration, a_c
-      float theta_acc_est = ( m_c + m_b )*( -B_v_p*x3_FIR -tanh(k_tanh*x3_FIR)*F_c_p + m_b*g*l*sin(x1_FIR) )/( l*l*m_b*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) ) + ( cos(x1_FIR)*(u_last - m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR) )/( l*(m_c + m_b - m_b*cos(x1_FIR)*cos(x1_FIR)) );
+      float theta_acc_est = ( M + m )*( -b_p_v*x3_FIR -tanh(k_tanh*x3_FIR)*b_p_c + m*g*l*sin(x1_FIR) )/( l*l*m*(M + m - m*cos(x1_FIR)*cos(x1_FIR)) ) + ( cos(x1_FIR)*(u_last - m*l*sin(x1_FIR)*x3_FIR*x3_FIR) )/( l*(M + m - m*cos(x1_FIR)*cos(x1_FIR)) );
       
       //gain for x-control
       float k_lin[] = { 10.5460, 15.8190 };
@@ -733,10 +831,10 @@ void loop()
       float lin_u =  -k_lin[1]*x2 -k_lin[1]*x4;
       
       //final control out put, energy control with position control
-      u = ( m_c + m_b )*a_c + m_b*l*sin(x1_FIR)*x3_FIR*x3_FIR -m_b*l*cos(x1_FIR)*theta_acc_est + lin_u;
+      u = ( M + m )*a_c + m*l*sin(x1_FIR)*x3_FIR*x3_FIR -m*l*cos(x1_FIR)*theta_acc_est + lin_u;
       
       //calculated needed armature current, i_a, to achieve control, u
-      setOutSled = u*r_pulley/K_t;
+      setOutSled = u*r/k_tau;
       
       //store final control for estimation of theta_acc in next loop
       u_last = u;
@@ -746,16 +844,16 @@ void loop()
       //<<
    
     //update currently used variables 
-    if( slideOn == 0 ){ current_x2 = x2_FIR;
-                        current_x4 = x4_FIR; }
-    else              { current_x2 = x2;
-                        current_x4 = x4;     }
+    if( slideOn ){ current_x     = x2;
+                   current_x_dot = x4;     }
+    else         { current_x     = x2_FIR;
+                   current_x_dot = x4_FIR; }
 
-    B_c_c        = estimateCartFriction( position,   coloumbP,   coloumbN,
-                                         current_x2, current_x4, setOutSled );
+    b_c_c  = estimateCartFriction( position,  coloumbP,      coloumbN,
+                                   current_x, current_x_dot, setOutSled );
     
-    float frictionComp = cartFrictionCompensation( B_c_c,    B_v_c, current_x4,
-                                                   r_pulley, K_t               );
+    float frictionComp = cartFrictionCompensation( b_c_c, b_c_v, current_x_dot,
+                                                   r,     k_tau                );
 
     setOutSledNoComp = setOutSled;
     setOutSled       = setOutSled + frictionComp;
@@ -770,7 +868,133 @@ void loop()
 //    printToTerminal( collectData, deci,   tSec,
 //                     x1,          x2,       x3,     x4,
 //                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-//                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+//                     x1Wrap,      setOutSledNoComp, setOutSled, b_c_c,
+//                     posPend1,    posPend2,         velPend1,   velPend2,
+//                     posSled,     velSled                                );
+    //<< 
+  } //<<<<SWING-UP AND SLIDING MODE <END<
+    //<<
+    //
+  /////////////////////////////////////////////////////////
+  ///////SWING-UP AND CATCH TWIN///////////////////////////
+  /////////////////////////////////////////////////////////
+  else if( setOut == 2 )
+  {
+    //enable cart motor output 
+    digitalWrite(ENABLESLED, HIGH);
+    
+    float tSec = float (time_stamp-time_now)/1000000;
+    
+    //initialize control and output variable
+    setOutSled = 0;
+    float u    = 0;
+
+    float b_c_c = estimateCartFriction( position,  coloumbP,      coloumbN,
+                                        current_x, current_x_dot, setOutSled );
+    
+    /////////////////////////////////////////////////////////
+    //////EDGE OF RAIL SECURITY//////////////////////////////
+    /////////////////////////////////////////////////////////
+    //
+    float sgnCart = posSled-.38;
+    if(      sgnCart > 0 ){ sgnCart =  1; }
+    else if( sgnCart < 0 ){ sgnCart = -1; }
+    else                  { sgnCart =  0; }
+    //
+    //  cart is close to edge   &&  velocity away from center is large
+    if( abs(posSled-.38) > .08  &&  sgnCart*velSled > 1 )
+    {
+      Serial.println("Secure Edge Active");
+      
+      setOutSled = -sgnCart*5; //<--breaking if cart runs away
+    }
+    /////////////////////////////////////////////////////////
+    ///////CATCH/////////////////////////////////////////////
+    /////////////////////////////////////////////////////////
+    //
+    else if( (abs(x1Wrap)+abs(x2Wrap)) < catchAngleTwin  )
+    {
+      catchTwin = true;
+
+      //set wider catch angle to stay in stabilization after wing-up sequence 
+      catchAngleTwin = 0.8;
+      
+      //final control
+      float u = 0;
+      
+      //calculating required current to obtain control, u
+      setOutSled = u*r/k_tau;
+
+      //option to set current limit peak
+      if(0)
+      {
+        float i_peak_limit = 6;
+        if( abs(setOutSled) > i_peak_limit )
+        {
+          if( setOutSled > 0 )
+          {
+            setOutSled = i_peak_limit;
+          }
+          else if( setOutSled < i_peak_limit )
+          {
+            setOutSled = -i_peak_limit;
+          }
+        }
+      }
+      //<<
+    } //<<<<CATCH <END<
+      //<<
+    /////////////////////////////////////////////////////////
+    ///////SWING-UP//////////////////////////////////////////
+    /////////////////////////////////////////////////////////
+    else //if(0)
+    {
+      catchTwin = false;
+      
+      //set narrow catch angle to provide
+      //best handover to sliding mode
+      catchAngleTwin = 0.1;
+      
+      //gain for x-control
+      float k_lin[] = { 10.5460, 15.8190 };
+      
+      //linear control of cart position
+      float lin_u =  -k_lin[1]*x3 -k_lin[1]*x6;
+      
+      //final control output, energy control with position control
+      u = 0 + lin_u;
+      
+      //calculated needed armature current, i_a, to achieve control, u
+      setOutSled = u*r/k_tau;
+      
+      //<<
+    } //<<<<SWING-UP <END<
+      //<<
+   
+    //update currently used variables 
+    current_x     = x3;
+    current_x_dot = x6;
+    
+    b_c_c = estimateCartFriction( position,  coloumbP,      coloumbN,
+                                  current_x, current_x_dot, setOutSled );
+    
+    float frictionComp = cartFrictionCompensation( b_c_c, b_c_v, current_x_dot,
+                                                   r,     k_tau                );
+
+    setOutSledNoComp = setOutSled;
+    setOutSled       = setOutSled + frictionComp;
+
+    //choose to print readable data (0) to print for data collection (1)
+    int collectData = 1;
+    
+    //choose nr of decimals printed after decimal point
+    int deci = 5;
+
+    //print mesurements depending on choice above
+//    printToTerminal( collectData, deci,   tSec,
+//                     x1,          x2,       x3,     x4,
+//                     x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
+//                     x1Wrap,      setOutSledNoComp, setOutSled, b_c_c,
 //                     posPend1,    posPend2,         velPend1,   velPend2,
 //                     posSled,     velSled                                );
     //<< 
@@ -849,7 +1073,7 @@ void loop()
     //choose nr of decimals printed after decimal point
     int deci = 5;
 
-    float B_c_c = 0; //to use print function (otherwise not declared here)
+    float b_c_c = 0; //to use print function (otherwise not declared here)
 
     float tSec = float (time_stamp-time_now)/1000000;
     
@@ -864,7 +1088,7 @@ void loop()
       printToTerminal( collectData, deci,     tSec,
                        x1,          x2,       x3,     x4,
                        x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-                       x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                       x1Wrap,      setOutSledNoComp, setOutSled, b_c_c,
                        posPend1,    posPend2,         velPend1,   velPend2,
                        posSled,     velSled                                );
     }
@@ -873,7 +1097,7 @@ void loop()
       printToTerminal( collectData, deci,     tSec,
                        x1,          x2,       x3,     x4,
                        x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-                       x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                       x1Wrap,      setOutSledNoComp, setOutSled, b_c_c,
                        posPend1,    posPend2,         velPend1,   velPend2,
                        posSled,     velSled                                );
     }
@@ -886,17 +1110,17 @@ void loop()
   //////////////////////////////////////////////////////////
   else if( setOut == 7 )
   {
-    slideOn = 0;
+    slideOn = false;
     //enable cart motor output 
     digitalWrite(ENABLESLED, HIGH);
    
     float tSec = float (time_stamp-time_now)/1000000;
     
-    float B_c_c = estimateCartFriction( position,   coloumbP,   coloumbN,
-                                        current_x2, current_x4, setOutSled );
+    float b_c_c = estimateCartFriction( position,  coloumbP,      coloumbN,
+                                        current_x, current_x_dot, setOutSled );
     
-    float frictionComp = cartFrictionCompensation( B_c_c,    B_v_c, current_x4,
-                                                   r_pulley, K_t               );
+    float frictionComp = cartFrictionCompensation( b_c_c, b_c_v, current_x_dot,
+                                                   r,     k_tau                );
 
     setOutSled = frictionComp; 
     
@@ -910,7 +1134,7 @@ void loop()
     printToTerminal( collectData, deci,   tSec,
                      x1,          x2,       x3,     x4,
                      x1_FIR,      x2_FIR,   x3_FIR, x4_FIR,
-                     x1Wrap,      setOutSledNoComp, setOutSled, B_c_c,
+                     x1Wrap,      setOutSledNoComp, setOutSled, b_c_c,
                      posPend1,    posPend2,         velPend1,   velPend2,
                      posSled,     velSled                                );
     //<<
@@ -934,13 +1158,20 @@ void loop()
     //>>>>---initialization--------------------------------
     //>>
 
-    // matrix array interpretation
-    // [ row *cols+ col ] = [ row ][ col ]
-    
     //variables for matrix sizes
-    int c1 = 6, r1 = 6, c2 = 0, r2 = 0;
+    int c1 = 0, r1 = 0, c2 = 0, r2 = 0;
     // 
-    float Q[c1*r1]  = {0};
+    // c1: cols in matrix 1   r1: rows in matrix 1 
+    // c2: cols in matrix 2   r2: rows in matrix 2
+    //
+    // matrix array-vector interpretation
+    // A[row][col] => A[ row *c1+ col ] = A[ vector element ]
+    //
+    // for matrix declarations as vectors
+    // float A[r1][c1] => float A[r1*c1]
+
+    r1 = 6, c1 = 6;
+    float Q[r1*c1]  = { 0 };
     //
     //setting diagonal elements of Q
     Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1;
@@ -950,11 +1181,9 @@ void loop()
     float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
     float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
 
-    c1 = 3, r1 = 3;
-    float R[c1*r1] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
-                       1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
-                      -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
-    
+    float R[3*3] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
+                     1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
+                    -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
     if( firstRunK )
     {
       //initialize estimated states
@@ -969,10 +1198,10 @@ void loop()
       firstRunK = false;
     }
 
-    float y[3][1] = { posPend1, posPend2, posSled };
+    float y[3*1] = { posPend1, posPend2, posSled };
    
     //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
-    float A[rows1*cols1] = 
+    float A[6*6] = 
       { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
         3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
         7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
@@ -980,13 +1209,13 @@ void loop()
         0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
         0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
     //
-    float B[6][1] = { 1.1173*eN5, 1.7692*eN5, 3.5419*eN6, 
+    float B[6*1] = { 1.1173*eN5, 1.7692*eN5, 3.5419*eN6, 
                       0.0033502,  0.005305,   0.001062   };
     //
-    float C[3][6] =
-      { {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 },
-        { 1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 },
-        { 3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335 } };
+    float C[3*6] =
+      {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 ,
+        1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 ,
+        3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335  };
     
     //>>
     //>>>>---prediction------------------------------------
@@ -997,17 +1226,17 @@ void loop()
     /////////////////////////////////////
 
     //>> A*xEstK
-    float A_X_xEstK[6][1] = { 0 };
+    float A_X_xEstK[6*1] = { 0 };
     //
     matrixMult( A_X_xEstK, A, xEstK,  6, 6, 6, 1 );
     
     //>> B*u_last
-    float B_X_uLast[6][1] = { 0 };
+    float B_X_uLast[6*1] = { 0 };
     //
     matrixMult( B_X_uLast, B, u_last, 6, 1, 1, 1 );
     
     //>> xPred = A*xEstK + B*u_last
-    float xPred[6][1] = { 0 };
+    float xPred[6*1] = { 0 };
     //
     matrixAdd( xPred, false, A_X_xEstK, B_X_uLast, 6, 1, 6, 1 );
 
@@ -1016,18 +1245,17 @@ void loop()
     ///////////////////////////
     
     //>> A*Pk
-    float A_X_Pk[6][6] = { 0 };
+    float A_X_Pk[6*6] = { 0 };
     //
     matrixMult( A_X_Pk, A, Pk, 6, 6, 6, 6 );
     
     //>> A'
-    cols1 = 6; rows1 = 6;
-    float AT[rows1*cols1] = { 0 };
+    float AT[6*6] = { 0 };
     //
-    matrixTranspose( AT, A, rows1, cols1 );
+    matrixTranspose( AT, A, 6, 6 );
     
     //>> A*Pk*A'
-    float A_X_Pk_X_AT[6][6] = { 0 };
+    float A_X_Pk_X_AT[6*6] = { 0 };
     //
     matrixMult( A_X_Pk_X_AT, A_X_Pk, AT, 6, 6, 6, 6 );
     
@@ -1044,37 +1272,37 @@ void loop()
     //////////////////////////////////////
     
     //>> C'
-    float CT[6][3] = { 0 };
+    float CT[6*3] = { 0 };
     //
     matrixTranspose( CT, C, 3, 6 );
     
     //>> Pk*C'
-    float Pk_X_CT[6][3] = { 0 };
+    float Pk_X_CT[6*3] = { 0 };
     //
     matrixMult( Pk_X_CT, Pk, CT, 6, 6, 6, 3 );
     
     //>> C*Pk
-    float C_X_Pk[3][6] = { 0 };
+    float C_X_Pk[3*6] = { 0 };
     //
     matrixMult( C_X_Pk, C, Pk, 3, 6, 6, 6 );
     
     //>> C*Pk*C'
-    float C_X_Pk_X_CT[3][3] = { 0 };
+    float C_X_Pk_X_CT[3*3] = { 0 };
     //
     matrixMult( C_X_Pk_X_CT, C_X_Pk, CT, 3, 6, 6, 3 );
     
     //>> C*Pk*C' + R
-    float C_X_Pk_X_CT_ADD_R[3][3] = { 0 };
+    float C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
     //
     matrixAdd( C_X_Pk_X_CT_ADD_R, false, C_X_Pk_X_CT, R, 3, 3, 3, 3 );
     
     //>> inv( C*Pk*C' + R )
-    float inv_C_X_Pk_X_CT_ADD_R[3][3] = { 0 };
+    float inv_C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
     //
     inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R );
     
     //>> K = Pk*C'*inv( C*Pk*C' + R )
-    float K[6][3]  = { 0 };
+    float K[6*3]  = { 0 };
     //
     matrixMult( K, Pk_X_CT, inv_C_X_Pk_X_CT_ADD_R, 6, 3, 3, 3 );
     
@@ -1083,17 +1311,17 @@ void loop()
     ///////////////////////////////////////
     
     //>> C*xPred
-    float C_X_xPred[3][1] = { 0 };
+    float C_X_xPred[3*1] = { 0 };
     //
     matrixMult( C_X_xPred, C, xPred, 3, 6, 6, 1 );
     
     //>> (y - C*xPred)
-    float y_SUB_C_X_xPred[3][1] = { 0 };
+    float y_SUB_C_X_xPred[3*1] = { 0 };
     //
     matrixAdd( y_SUB_C_X_xPred, true, y, C_X_xPred, 3, 1, 3, 1 );
     
     //>> K*(y - C*xPred)
-    float K_X_y_SUB_C_X_xPred[6][1] = { 0 };
+    float K_X_y_SUB_C_X_xPred[6*1] = { 0 };
     //
     matrixMult( K_X_y_SUB_C_X_xPred, K, y_SUB_C_X_xPred, 6, 3, 3, 1 );
     
@@ -1106,21 +1334,23 @@ void loop()
     ////////////////////////
     
     //>> I
-    float I[6][6]  = {0};
-    I[0][0] = I[1][1] = I[2][2] = I[3][3] = I[4][4] = I[5][5] = 1; 
+    float I[6*6]  = {0};
+    r1 = 6, c1 = 6;
+    I[0 *c1+ 0] = I[1 *c1+ 1] = I[2 *c1+ 2] = 1;
+    I[3 *c1+ 3] = I[4 *c1+ 4] = I[5 *c1+ 5] = 1; 
     
     //>> K*C
-    float K_X_C[6][6] = { 0 };
+    float K_X_C[6*6] = { 0 };
     //
     matrixMult( K_X_C, K, C, 6, 3, 3, 6 );
     
     //>> K*C*Pk
-    float K_X_C_X_Pk[6][6] = { 0 };
+    float K_X_C_X_Pk[6*6] = { 0 };
     //
     matrixMult( K_X_C_X_Pk, K_X_C, Pk, 6, 6, 6, 6 );
     
     //>> Pk = I - K*C*Pk
-    float P[6][6] = { 0 };
+    float P[6*6] = { 0 };
     //
     matrixAdd( Pk, true, I, K_X_C_X_Pk, 6, 6, 6, 6 );
     //Pk was updated
@@ -1130,12 +1360,13 @@ void loop()
     //>>
     
     //store Kalman variables using reduced notation
-    float x1_K = xEstK[0][0];
-    float x2_K = xEstK[1][0];
-    float x3_K = xEstK[2][0];
-    float x4_K = xEstK[3][0];
-    float x5_K = xEstK[4][0];
-    float x6_K = xEstK[5][0];
+    r1 = 6, c1 = 1;
+    float x1_K = xEstK[0 *c1+ 0];
+    float x2_K = xEstK[1 *c1+ 0];
+    float x3_K = xEstK[2 *c1+ 0];
+    float x4_K = xEstK[3 *c1+ 0];
+    float x5_K = xEstK[4 *c1+ 0];
+    float x6_K = xEstK[5 *c1+ 0];
     
     if( tSec > testTime )
     {
@@ -1206,94 +1437,107 @@ void loop()
 } //<<<<MAIN-LOOP <END<
   //<<
 
+///////////////////////////////////////////////////////////
+//
+// matrix sizes
+// c1: cols in matrix 1   r1: rows in matrix 1 
+// c2: cols in matrix 2   r2: rows in matrix 2
+//
+// matrix array-vector interpretation
+// A[row][col] => A[ row *c1+ col ] = A[ vector element ]
+//
+// for matrix declarations as vectors
+// float A[r1][c1] => float A[r1*c1]
+//
+///////////////////////////////////////////////////////////
 
-void inv3x3Matrix( float * invM[3][3], float m[3][3] )
+void inv3x3Matrix( float * invM[3*3], float m[3*3] )
 {
-  float det  = m[0][0] * (m[1][1]*m[2][2] - m[1][2] * m[2][1]);
-        det -= m[0][1] * (m[1][0]*m[2][2] - m[1][2] * m[2][0]);
-        det += m[0][2] * (m[1][0]*m[2][1] - m[1][1] * m[2][0]);
+  float c = 3;
+  float det  = m[0 *c+ 0] * (m[1 *c+ 1]*m[2 *c+ 2] - m[1 *c+ 2] * m[2 *c+ 1]);
+        det -= m[0 *c+ 1] * (m[1 *c+ 0]*m[2 *c+ 2] - m[1 *c+ 2] * m[2 *c+ 0]);
+        det += m[0 *c+ 2] * (m[1 *c+ 0]*m[2 *c+ 1] - m[1 *c+ 1] * m[2 *c+ 0]);
 
   float invDet = 1.0 / (det);
 
-  invM[0][0] = (invDet) * (m[1][1] * m[2][2] - m[1][2] * m[2][1]);
-  invM[1][0] = (invDet) * (m[1][2] * m[2][0] - m[1][0] * m[2][2]);
-  invM[2][0] = (invDet) * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  invM[0 *c+ 0] = (invDet) * (m[1 *c+ 1] * m[2 *c+ 2] - m[1 *c+ 2] * m[2 *c+ 1]);
+  invM[1 *c+ 0] = (invDet) * (m[1 *c+ 2] * m[2 *c+ 0] - m[1 *c+ 0] * m[2 *c+ 2]);
+  invM[2 *c+ 0] = (invDet) * (m[1 *c+ 0] * m[2 *c+ 1] - m[1 *c+ 1] * m[2 *c+ 0]);
 
-  invM[0][1] = (invDet) * (m[0][2] * m[2][1] - m[0][1] * m[2][2]);
-  invM[1][1] = (invDet) * (m[0][0] * m[2][2] - m[0][2] * m[2][0]);
-  invM[2][1] = (invDet) * (m[0][1] * m[2][0] - m[0][0] * m[2][1]);
+  invM[0 *c+ 1] = (invDet) * (m[0 *c+ 2] * m[2 *c+ 1] - m[0 *c+ 1] * m[2 *c+ 2]);
+  invM[1 *c+ 1] = (invDet) * (m[0 *c+ 0] * m[2 *c+ 2] - m[0 *c+ 2] * m[2 *c+ 0]);
+  invM[2 *c+ 1] = (invDet) * (m[0 *c+ 1] * m[2 *c+ 0] - m[0 *c+ 0] * m[2 *c+ 1]);
 
-  invM[0][2] = (invDet) * (m[0][1] * m[1][2] - m[0][2] * m[1][1]);
-  invM[1][2] = (invDet) * (m[0][2] * m[1][0] - m[0][0] * m[1][2]);
-  invM[2][2] = (invDet) * (m[0][0] * m[1][1] - m[0][1] * m[1][0]);
+  invM[0 *c+ 2] = (invDet) * (m[0 *c+ 1] * m[1 *c+ 2] - m[0 *c+ 2] * m[1 *c+ 1]);
+  invM[1 *c+ 2] = (invDet) * (m[0 *c+ 2] * m[1 *c+ 0] - m[0 *c+ 0] * m[1 *c+ 2]);
+  invM[2 *c+ 2] = (invDet) * (m[0 *c+ 0] * m[1 *c+ 1] - m[0 *c+ 1] * m[1 *c+ 0]);
 }
 
-// [ row*cols + col ] = [ row ][ col ]
-
 void matrixTranspose( float matrixT[], float matrix[],
-                                       int rows, int cols ) 
+                                       int r1, int c1 ) 
 {
   int i, j;
-  for (   i = 0; i < rows; i++ )
+  for (   i = 0; i < r1; i++ )
   { 
-    for ( j = 0; j < cols; j++ )
-      matrixT[i *cols+ j] = matrix[j *rows+ i]; 
+    for ( j = 0; j < c1; j++ )
+
+      matrixT[i *r1+ j] = matrix[j *c1+ i]; 
   }
 }
 
-void matrixAdd( float * add[][], bool substract,
-                float   matrix1[][],      float matrix2[][],
-                int     rows1, int cols1, int rows2, int cols2 )
+void matrixAdd( float * add[], bool substract,
+                float   matrix1[],  float matrix2[],
+                int     r1, int c1, int r2, int c2  )
 {
   int i, j;
 
   //check if matrix dimentions match, if not: exit subroutine
-  if( cols1 ~= cols2 || rows1 ~= rows2 )
+  if( c1 ~= c2 || r1 ~= r2 )
   {
     Serial.print( "matrixAdd: Matrix Dimention Mismatch!" );
     logStop = 1;
     setOut  = 0; //stop logging
   }
 
-  for(   i = 0; i < rows1; ++i )
+  for(   i = 0; i < r1; ++i )
   {
-    for( j = 0; j < cols1; ++j )
+    for( j = 0; j < c1; ++j )
     {
       if substract
       {
-        add[i][j] = matrix1[i][j] - matrix2[i][j];
+        add[i *c1+ j] = matrix1[i *c1+ j] - matrix2[i *c2+ j];
       }
       else
       {
-        add[i][j] = matrix1[i][j] + matrix2[i][j];
+        add[i *c1+ j] = matrix1[i *c1+ j] + matrix2[i *c2+ j];
       }
     }
   }
 }
 
-void matrixMult( float * mult[][],
-                 float   matrix1[][],      float matrix2[][],
-                 int     rows1, int cols1, int rows2, int cols2 )
+void matrixMult( float mult[],
+                 float matrix1[],  float matrix2[],
+                 int   r1, int c1, int r2, int c2  )
 {
   int i, j, k;
 
   //check if matrix dimentions match, if not: exit subroutine
-  if( cols1 ~= rows2 )
+  if( c1 ~= r2 )
   {
     Serial.print( "matrixMult: Matrix Dimention Mismatch!" );
     logStop = 1;
     setOut  = 0; //stop logging
   }
 
-  for(     i = 0; i < rows1; ++i )
+  for(     i = 0; i < r1; ++i )
   {
-    for(   j = 0; j < cols2; ++j )
+    for(   j = 0; j < c2; ++j )
     {
-      mult[i][j] = 0;
+      mult[i *c2+ j] = 0;
       
-      for( k = 0; k < cols1; ++k )
+      for( k = 0; k < c1; ++k )
       {
-        mult[i][j] += matrix1[i][k]*matrix2[k][j];
+        mult[i *c2+ j] += matrix1[i *c1+ k]*matrix2[k *c2+ j];
       }
     }
   }
@@ -1339,20 +1583,20 @@ float estimateCartFriction( float position[],
                             float x4,
                             float u          )
 {
-  float B_c_c = 0;
+  float b_c_c = 0;
   if( (x4 > 0) || ((x4 == 0) && (u > 0)) )
   {
-    B_c_c = interpolateFrictionLookup( position, coloumbP, x2 );
+    b_c_c = interpolateFrictionLookup( position, coloumbP, x2 );
   }
   else if( (x4 < 0) || ((x4 == 0) && (u < 0)) )
   {
-    B_c_c = interpolateFrictionLookup( position, coloumbN, x2 );
+    b_c_c = interpolateFrictionLookup( position, coloumbN, x2 );
   }
-  return B_c_c; 
+  return b_c_c; 
 }
 
 //calculate friction compensation based on current friction and velocity
-float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
+float cartFrictionCompensation( float b_c_c, float b_c_v, float x4,
                                 float r,     float k_tau           )
 {
   //dead-band sign function
@@ -1371,7 +1615,7 @@ float cartFrictionCompensation( float B_c_c, float B_v_c, float x4,
   float x4_0 = x4;
   if( (x4_0 < .1) && (x4_0 > -.1 )){ x4_0 = 0; }
   
-  float frictionComp = r / k_tau *( (sat_x4*(B_c_c)) + x4_0*B_v_c*0 );
+  float frictionComp = r / k_tau *( (sat_x4*(b_c_c)) + x4_0*b_c_v*0 );
   
   return frictionComp;
 }
@@ -1405,7 +1649,7 @@ void printToTerminal( int   collectData, int   deci, float tSec,
                       float x1_FIR,      float x2_FIR,
                       float x3_FIR,      float x4_FIR,
                       float x1Wrap,      float setOutSledNoComp,
-                      float setOutSled,  float B_c_c,
+                      float setOutSled,  float b_c_c,
                       float posPend1,    float posPend2,
                       float velPend1,    float velPend2,
                       float posSled,     float velSled             )
@@ -1450,7 +1694,7 @@ void printToTerminal( int   collectData, int   deci, float tSec,
 //    Serial.print( ", "                   );
 //    Serial.print( setOutSled,       deci );
 //    Serial.print( ", "                   );
-//    Serial.print( B_c_c,            deci );
+//    Serial.print( b_c_c,            deci );
   }
   else
   {
