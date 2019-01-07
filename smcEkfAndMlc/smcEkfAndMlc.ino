@@ -186,8 +186,8 @@ Joint pend2( 3, SAMPLINGTIME );
 
 struct firStru
 {
-  float xIn;         //   set window size here
-  float buff[5];     //<--must be same size as
+  float xIn;          //   set window size here
+  float buff[10];     //<--must be same size as
   int   offset;                               //
 };                                              //
                                                  //
@@ -197,9 +197,9 @@ struct firStru
 int   offsetFIR_x3 = 0;                     //
 int   offsetFIR_x4 = 0;                  //
 int   offsetFIR_p2 = 0;               //
-float buffFIR_x3[5];              //<--here
-float buffFIR_x4[5];          //<--here
-float buffFIR_p2[5];      //<--and here
+float buffFIR_x3[10];              //<--here
+float buffFIR_x4[10];          //<--here
+float buffFIR_p2[10];      //<--and here
 
 int logStop = 0;
 
@@ -227,7 +227,7 @@ float u_last       = 0;    //used by Kalman and swing so far
 float catchAngle   = 0.02;
 int   slideOn      = false;
 
-bool twinActive      = false;
+int  twinActive      = 0;
 bool twinCatch       = false;
 float catchAngleTwin = 0.1;
 
@@ -366,9 +366,11 @@ void loop()
     if( input == "0" )
     {
       setOut   = 0;
+      twinActive = 0;      
       
       //reset EKF
       P_correction_EKF_not_empty_init();
+      first_run = true;
     
       //reset Kalman
       firstRunK = true;
@@ -385,6 +387,7 @@ void loop()
     else if( input == "2" )
     {
       setOut = 2;
+      twinActive = 1;
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");      
@@ -405,20 +408,13 @@ void loop()
       Serial.print("\n");
       Serial.print("startLogging");
     }
+    ///////Friction Compensation Only//////////////////////
     else if( input == "f" )
     {
       setOut = 7;
       time_now = micros();
       Serial.print("\n");
       Serial.print("startLogging");      
-    }
-    ///////Kalman Filter Test////////////
-    else if( input == "8" )
-    {
-      setOut = 8;
-      time_now = micros();
-      Serial.print("\n");
-      Serial.print("startLogging");
     }
     ///////Reset Variables/////////////////////////////////
     else if( input == "r" )
@@ -503,7 +499,7 @@ void loop()
   float p2_FIR = (p2     - p2_last)/t_delta;  
 
   //set window size for all FIR filters
-  float  N_FIR = (sizeof(buffFIR_x3)/sizeof(buffFIR_x3[0]));  //<--same size as for x4
+  float  N_FIR = (sizeof(buffFIR_x3)/sizeof(buffFIR_x3[0]));
   
   //filter coefficients
   float h[(int)N_FIR];
@@ -587,13 +583,355 @@ void loop()
   p2_last     = p2;
   p2_FIR_last = p2_FIR;
   t_last      = time_stamp;
+ 
+  //initialize state variables
+  //
+  float current_x     = 0;
+  float current_x_dot = 0;
+  //
+  float x1 = 0, x2 = 0, x3 = 0, x4 = 0, x5 = 0, x6 = 0;
+  //
+  float x1Wrap = 0, x2Wrap = 0;
   
   //choose states depending on which system (twin or not) is active
   if( twinActive )
   {
     if( twinCatch )
     {
-    ///////KALMAN FILTER
+      ///////KALMAN FILTER TEST//////////////////////////////
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+        //creating wrapped vertion of measured theta1 for KF
+        float pos1Wrap = float(fmod( float(posPend1 + PI), float(2*PI) ));
+        if( pos1Wrap < 0 )
+        {
+          pos1Wrap = float(pos1Wrap + float(2*PI));
+        }
+        pos1Wrap = float(pos1Wrap - PI);
+        
+        //creating wrapped vertion of measured theta2 for KF
+        float pos2Wrap = float(fmod( float(posPend2 + PI), float(2*PI) ));
+        if( pos2Wrap < 0 )
+        {
+          pos2Wrap = float(pos2Wrap + float(2*PI));
+        }
+        pos2Wrap = float(pos2Wrap - PI);
+      //
+      //
+      //
+      //
+      //>>
+      //>>>>---initialization--------------------------------
+      //>>
+
+      //variables for matrix sizes
+      int c1 = 0, r1 = 0, c2 = 0, r2 = 0;
+      // 
+      // c1: cols in matrix 1   r1: rows in matrix 1 
+      // c2: cols in matrix 2   r2: rows in matrix 2
+      //
+      // matrix array-vector interpretation
+      // A[row][col] => A[ row *c1+ col ] = A[ vector element ]
+      //
+      // for matrix declarations as vectors
+      // float A[r1][c1] => float A[r1*c1]
+
+      r1 = 6, c1 = 6;
+      float Q[r1*c1]  = { 0 };
+      //
+      //setting diagonal elements of Q
+      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 2; Q[2 *c1+ 2] = .1;
+      Q[3 *c1+ 3] = 4.5; Q[4 *c1+ 4] = 4.5; Q[5 *c1+ 5] = 3; 
+
+//      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1;
+//      Q[3 *c1+ 3] = .5; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = .07; 
+
+      //introducing shorthand for scientific e-notation
+      float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
+      float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
+
+      float R[3*3] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
+                       1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
+                      -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
+      
+  //    float R[3*3] = { .01,          1.2205*eN8, -3.5968*eN10 ,
+  //                     1.2205*eN8 ,  .01,        -3.1029*eN9  ,
+  //                    -3.5968*eN10, -3.1029*eN9,  .01          };
+      //!!!!ONLY FOR TUNING OF KF!!!!!!!!
+  //    pos1Wrap = posPend1 -PI; //!!!!!!!!
+  //   pos2Wrap = posPend2 -PI; //!!!!!!!!
+      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+      if( firstRunK )
+      {
+        //initialize estimated states
+        r1 = 6; c1 = 1;
+        xEstK[0 *c1+ 0] = pos1Wrap;
+        xEstK[1 *c1+ 0] = pos2Wrap;
+        xEstK[2 *c1+ 0] = posSled;
+        xEstK[3 *c1+ 0] = x3_FIR;
+        xEstK[4 *c1+ 0] = p2_FIR;
+        xEstK[5 *c1+ 0] = x4_FIR;
+      
+        firstRunK = false;
+      }
+
+      float y[3*1] = { pos1Wrap, pos2Wrap, posSled };
+     
+      //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
+      float A[6*6] = 
+        { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
+          3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
+          7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
+          0.21397   , 0.0082496 , 0,  0.9993    , -4.9467*eN5, 0       ,
+          0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
+          0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
+      //
+      float B[6*1] = { 1.1173*eN5,
+                       1.7692*eN5,
+                       3.5419*eN6, 
+                       0.0033502 ,
+                       0.005305  ,
+                       0.001062   };
+      //
+      float C[3*6] =
+        {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 ,
+          1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 ,
+          3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335  };
+
+//  float A[6*6] =
+//    {  0.999278670524648, -0.000033049478648, 0  ,  0.006667051793694, -0.000000139829971,                 0,
+//      -0.000051190549469,  0.998856234051542, 0  , -0.000000200330457,  0.006664965758812,                 0,
+//       0.000010245505110,  0.000010477815032, 1.0,  0.000000040095032,  0.000000044330883, 0.006670001667500,
+//      -0.216290643184279, -0.009909886172465, 0  ,  0.999115480339056, -0.000041928016745,                 0,
+//      -0.015349486258402, -0.342958219645077, 0  , -0.000060069087566,  0.998489982779698,                 0,
+//       0.003072114707328,  0.003141772837196, 0  ,  0.000012022495363,  0.000013292615256, 1.000000000000000 };
+//  float B[6*1] =
+//    { -0.000011172065162,
+//      -0.000017696850887,
+//       0.000003541926744,
+//      -0.003349943738961,
+//      -0.005306400738433,
+//       0.001062046734144 };
+//  float C[3*6] =
+//    {  0.999639335262324, -0.000016524739324, 0  ,  0.003333525896847, -0.000000069914985,                 0,
+//      -0.000025595274735,  0.999428117025771, 0  , -0.000000100165229,  0.003332482879406,                 0,
+//       0.000005122752555,  0.000005238907516, 1.0,  0.000000020047516,  0.000000022165441, 0.003335000833750 };
+//
+ 
+      //>>
+      //>>>>---prediction------------------------------------
+      //>>
+
+      /////////////////////////////////////
+      //>> xPred = A*xEstK + B*u_last  <<//
+      /////////////////////////////////////
+
+      //>> A*xEstK
+      float A_X_xEstK[6*1] = { 0 };
+      //
+      matrixMult( A_X_xEstK, A, xEstK,  6, 6, 6, 1 );
+
+      //>> B*u_last
+      float B_X_uLast[6*1] = { 0 };
+      //
+      float uLast[1*1] = { u_last }; //for type compatibility with matrixMult
+      //
+      matrixMult( B_X_uLast, B, uLast, 6, 1, 1, 1 );
+      
+      //>> xPred = A*xEstK + B*u_last
+      float xPred[6*1] = { 0 };
+      //
+      matrixAdd( xPred, false, A_X_xEstK, B_X_uLast, 6, 1, 6, 1 );
+
+      ///////////////////////////
+      //>> Pk = A*Pk*A' + Q  <<//
+      ///////////////////////////
+      
+      //>> A*Pk
+      float A_X_Pk[6*6] = { 0 };
+      //
+      matrixMult( A_X_Pk, A, Pk, 6, 6, 6, 6 );
+      
+      //>> A'
+      float AT[6*6] = { 0 };
+      //
+      matrixTranspose( AT, A, 6, 6 );
+      
+      //>> A*Pk*A'
+      float A_X_Pk_X_AT[6*6] = { 0 };
+      //
+      matrixMult( A_X_Pk_X_AT, A_X_Pk, AT, 6, 6, 6, 6 );
+      
+      //>> Pk = A*Pk*A' + Q
+      matrixAdd( Pk, false, A_X_Pk_X_AT, Q, 6, 6, 6, 6 );
+      //old Pk was overwritten
+      
+      //>>
+      //>>>>---update----------------------------------------
+      //>>
+
+      //////////////////////////////////////
+      //>> K = Pk*C'*inv( C*Pk*C' + R ) <<//
+      //////////////////////////////////////
+      
+      //>> C'
+      float CT[6*3] = { 0 };
+      //
+      matrixTranspose( CT, C, 3, 6 );
+      
+      //>> Pk*C'
+      float Pk_X_CT[6*3] = { 0 };
+      //
+      matrixMult( Pk_X_CT, Pk, CT, 6, 6, 6, 3 );
+      
+      //>> C*Pk
+      float C_X_Pk[3*6] = { 0 };
+      //
+      matrixMult( C_X_Pk, C, Pk, 3, 6, 6, 6 );
+      
+      //>> C*Pk*C'
+      float C_X_Pk_X_CT[3*3] = { 0 };
+      //
+      matrixMult( C_X_Pk_X_CT, C_X_Pk, CT, 3, 6, 6, 3 );
+      
+      //>> C*Pk*C' + R
+      float C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
+      //
+      matrixAdd( C_X_Pk_X_CT_ADD_R, false, C_X_Pk_X_CT, R, 3, 3, 3, 3 );
+      
+      //>> inv( C*Pk*C' + R )
+      float inv_C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
+      //
+      inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R );
+      
+      //>> K = Pk*C'*inv( C*Pk*C' + R )
+      float K[6*3]  = { 0 };
+      //
+      matrixMult( K, Pk_X_CT, inv_C_X_Pk_X_CT_ADD_R, 6, 3, 3, 3 );
+      
+      ///////////////////////////////////////
+      //>> xEstK = xPred + K*(y - C*xPred) <<//
+      ///////////////////////////////////////
+      
+      //>> C*xPred
+      float C_X_xPred[3*1] = { 0 };
+      //
+      matrixMult( C_X_xPred, C, xPred, 3, 6, 6, 1 );
+      
+      //>> (y - C*xPred)
+      float y_SUB_C_X_xPred[3*1] = { 0 };
+      //
+      matrixAdd( y_SUB_C_X_xPred, true, y, C_X_xPred, 3, 1, 3, 1 );
+      
+      //>> K*(y - C*xPred)
+      float K_X_y_SUB_C_X_xPred[6*1] = { 0 };
+      //
+      matrixMult( K_X_y_SUB_C_X_xPred, K, y_SUB_C_X_xPred, 6, 3, 3, 1 );
+      
+      //>> xEstK = xPred + K*(y - C*xPred)
+      matrixAdd( xEstK, false, xPred, K_X_y_SUB_C_X_xPred, 6, 1, 6, 1 );
+      //xEstK was updated
+      
+      ////////////////////////
+      //>> Pk = I - K*C*Pk <<//
+      ////////////////////////
+      
+      //>> I
+      float I[6*6]  = {0};
+      r1 = 6, c1 = 6;
+      I[0 *c1+ 0] = I[1 *c1+ 1] = I[2 *c1+ 2] = 1;
+      I[3 *c1+ 3] = I[4 *c1+ 4] = I[5 *c1+ 5] = 1; 
+      
+      //>> K*C
+      float K_X_C[6*6] = { 0 };
+      //
+      matrixMult( K_X_C, K, C, 6, 3, 3, 6 );
+      
+      //>> K*C*Pk
+      float K_X_C_X_Pk[6*6] = { 0 };
+      //
+      matrixMult( K_X_C_X_Pk, K_X_C, Pk, 6, 6, 6, 6 );
+      
+      //>> Pk = I - K*C*Pk
+      float P[6*6] = { 0 };
+      //
+      matrixAdd( Pk, true, I, K_X_C_X_Pk, 6, 6, 6, 6 );
+      //Pk was updated
+      
+      //>>
+      //>>>>---Kalman filter end-----------------------------
+      //>>
+      
+      //store Kalman variables using reduced notation
+      r1 = 6, c1 = 1;
+      x1 = xEstK[0 *c1+ 0];
+      x2 = xEstK[1 *c1+ 0];
+      x3 = xEstK[2 *c1+ 0];
+      x4 = xEstK[3 *c1+ 0];
+      x5 = xEstK[4 *c1+ 0];
+      x6 = xEstK[5 *c1+ 0];
+      
+      //since KF only works in zero
+      x1Wrap = x1;
+      x2Wrap = x2;
+ 
+      //
+      //
+      //
+      //
+      //
+      int deci = 5;
+      //
+      //time converted from micro sec to sec
+      float tSec = float(float(time_stamp)/1000000);  // [s]
+      //
+      //output for logging
+      Serial.print( tSec,     deci );
+      Serial.print( ", "           );
+      Serial.print( pos1Wrap, deci );
+      Serial.print( ", "           );
+      Serial.print( pos2Wrap, deci );
+      Serial.print( ", "           );
+      Serial.print( posSled,  deci );
+      Serial.print( ", "           );
+      Serial.print( velPend1, deci );
+      Serial.print( ", "           );
+      Serial.print( velPend2, deci );
+      Serial.print( ", "           );
+      Serial.print( velSled,  deci );
+      Serial.print( ", "           );
+      Serial.print( x1,       deci );
+      Serial.print( ", "           );
+      Serial.print( x2,       deci );
+      Serial.print( ", "           );
+      Serial.print( x3,       deci );
+      Serial.print( ", "           );
+      Serial.print( x4,       deci );
+      Serial.print( ", "           );
+      Serial.print( x5,       deci );
+      Serial.print( ", "           );
+      Serial.print( x6,       deci );
+      logStop = 1;
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      current_x     = x3;  //x
+      current_x_dot = x6;  //x_dot
     }
     else //if swing-up twin
     {
@@ -604,12 +942,29 @@ void loop()
       x4 = x3_FIR; //theta1_dot
       x5 = p2_FIR; //theta2_dot
       x6 = x4_FIR; //x_dot
+      
+      //creating wrapped vertion of theta1 for catch
+      x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+      if( x1Wrap < 0 )
+      {
+        x1Wrap = float(x1Wrap + float(2*PI));
+      }
+      x1Wrap = float(x1Wrap - PI);
+      
+      //creating wrapped vertion of theta2 for catch
+      x2Wrap = float(fmod( float(x2 + PI), float(2*PI) ));
+      if( x2Wrap < 0 )
+      {
+        x2Wrap = float(x2Wrap + float(2*PI));
+      }
+      x2Wrap = float(x2Wrap - PI);
+
     }
     current_x     = x3;  //x
     current_x_dot = x6;  //x_dot
     
     //creating wrapped vertion of theta1 for catch
-    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+    x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
     if( x1Wrap < 0 )
     {
       x1Wrap = float(x1Wrap + float(2*PI));
@@ -617,7 +972,7 @@ void loop()
     x1Wrap = float(x1Wrap - PI);
     
     //creating wrapped vertion of theta2 for catch
-    float x2Wrap = float(fmod( float(x2 + PI), float(2*PI) ));
+    x2Wrap = float(fmod( float(x2 + PI), float(2*PI) ));
     if( x2Wrap < 0 )
     {
       x2Wrap = float(x2Wrap + float(2*PI));
@@ -643,14 +998,12 @@ void loop()
     EKF(y_meas, setOutSledNoComp, SAMPLINGTIME, x_init, x_est_correction);
     
     //change coordinate convention
-    float x1 = x_est_correction[1];
-    float x2 = x_est_correction[0]-0.38; //<--rail center as zero
-    float x3 = x_est_correction[3];
-    float x4 = x_est_correction[2];
+    x1 = x_est_correction[1];
+    x2 = x_est_correction[0]-0.38; //<--rail center as zero
+    x3 = x_est_correction[3];
+    x4 = x_est_correction[2];
     
     //update currently used variables if filter is in use
-    float current_x;
-    float current_x_dot;
     //
     if( slideOn ){ current_x     = x2;       //x
                    current_x_dot = x4;     } //x_dot
@@ -658,14 +1011,14 @@ void loop()
                    current_x_dot = x4_FIR; } //x_dot
 
     //creating wrapped vertion of angle for sliding mode
-    float x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
+    x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
     if( x1Wrap < 0 )
     {
       x1Wrap = float(x1Wrap + float(2*PI));
     }
     x1Wrap = float(x1Wrap - PI);
   }  
-
+ 
   /////////////////////////////////////////////////////////
   ///////STOP ALL//////////////////////////////////////////
   /////////////////////////////////////////////////////////
@@ -726,7 +1079,9 @@ void loop()
     if( abs(posSled-.38) > .08  &&  sgnCart*velSled > 1 )
     {
       Serial.println("Secure Edge Active");
-      
+    
+      Serial.println(sgnCart);
+
       setOutSled = -sgnCart*5; //<--breaking if cart runs away
     }
     /////////////////////////////////////////////////////////
@@ -736,7 +1091,7 @@ void loop()
     else if( abs(x1Wrap) < catchAngle )
     {
       slideOn = true;
-
+     
       //set wider catch angle to stay in sliding mode after wing-up sequence 
       catchAngle = 0.2;
       
@@ -755,7 +1110,7 @@ void loop()
       float k_lin[] = { 10.5460 , 15.8190 };
 
       //optional linear position (x) controller
-      float lin_u = float( -k_lin[1]*x2 -k_lin[1]*x4 );
+      float lin_u = float( -k_lin[0]*x2 -k_lin[1]*x4 );
       
       //final control
       float u = - satS*beta*g_b_inv;// + lin_u;
@@ -809,7 +1164,7 @@ void loop()
       float a_max = u_max/(M + m);
       
       //extra energy offset from equilibrium to get fast catch
-      float E_off = -.03; // -.007;
+      float E_off = -.01;// -.03; // -.007;
       
       //energy error
       float E_delta = .5*m*l*l*x3*x3 + m*g*l*(cos(x1_FIR) - 1) + E_off;
@@ -828,7 +1183,7 @@ void loop()
       float k_lin[] = { 10.5460, 15.8190 };
       
       //linear control of cart position
-      float lin_u =  -k_lin[1]*x2 -k_lin[1]*x4;
+      float lin_u =  -k_lin[0]*x2 -k_lin[1]*x4;
       
       //final control out put, energy control with position control
       u = ( M + m )*a_c + m*l*sin(x1_FIR)*x3_FIR*x3_FIR -m*l*cos(x1_FIR)*theta_acc_est + lin_u;
@@ -914,33 +1269,34 @@ void loop()
     //
     else if( (abs(x1Wrap)+abs(x2Wrap)) < catchAngleTwin  )
     {
-      catchTwin = true;
+      twinCatch = true;
 
       //set wider catch angle to stay in stabilization after wing-up sequence 
       catchAngleTwin = 0.8;
       
-      //final control
-      float u = 0;
+      //LQR gain vector
+      float kLQR[] = { -2005.64, 1823.86, 27.31, -354.10, 249.88, 37.16 };
+
+      //LQR
+      u = -kLQR[0]*x1 -kLQR[1]*x2 -kLQR[2]*x3
+          -kLQR[3]*x4 -kLQR[4]*x5 -kLQR[5]*x6;
+      
+      //option to set current limit peak
+      if(1)
+      {
+        float i_peak_limit = 8;
+        float u_peak_limit = i_peak_limit*k_tau/r;
+        
+        if( abs(u) > u_peak_limit )
+        {
+          if(      u > 0 ){ u =  u_peak_limit; }
+          else if( u < 0 ){ u = -u_peak_limit; }
+        }
+      }
       
       //calculating required current to obtain control, u
       setOutSled = u*r/k_tau;
 
-      //option to set current limit peak
-      if(0)
-      {
-        float i_peak_limit = 6;
-        if( abs(setOutSled) > i_peak_limit )
-        {
-          if( setOutSled > 0 )
-          {
-            setOutSled = i_peak_limit;
-          }
-          else if( setOutSled < i_peak_limit )
-          {
-            setOutSled = -i_peak_limit;
-          }
-        }
-      }
       //<<
     } //<<<<CATCH <END<
       //<<
@@ -949,7 +1305,7 @@ void loop()
     /////////////////////////////////////////////////////////
     else //if(0)
     {
-      catchTwin = false;
+      twinCatch = false;
       
       //set narrow catch angle to provide
       //best handover to sliding mode
@@ -962,7 +1318,7 @@ void loop()
       float lin_u =  -k_lin[1]*x3 -k_lin[1]*x6;
       
       //final control output, energy control with position control
-      u = 0 + lin_u;
+      u = 0;// + lin_u;
       
       //calculated needed armature current, i_a, to achieve control, u
       setOutSled = u*r/k_tau;
@@ -1141,275 +1497,6 @@ void loop()
   } //<<<<FRICTION COMPENSATION ONLY <END<
     //<<
     //  
-  /////////////////////////////////////////////////////////
-  ///////KALMAN FILTER TEST////////////////////////////////
-  /////////////////////////////////////////////////////////
-  else if( setOut == 8 )
-  {
-    digitalWrite(ENABLESLED, HIGH);
-    setOutPend1 = 0;
-    setOutSled  = 0;
-    
-    float tSec   = float(float(time_stamp-time_now)/1000000);  // [s]
-    
-    int testTime = 20;    // [s]
-    
-    //>>
-    //>>>>---initialization--------------------------------
-    //>>
-
-    //variables for matrix sizes
-    int c1 = 0, r1 = 0, c2 = 0, r2 = 0;
-    // 
-    // c1: cols in matrix 1   r1: rows in matrix 1 
-    // c2: cols in matrix 2   r2: rows in matrix 2
-    //
-    // matrix array-vector interpretation
-    // A[row][col] => A[ row *c1+ col ] = A[ vector element ]
-    //
-    // for matrix declarations as vectors
-    // float A[r1][c1] => float A[r1*c1]
-
-    r1 = 6, c1 = 6;
-    float Q[r1*c1]  = { 0 };
-    //
-    //setting diagonal elements of Q
-    Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1;
-    Q[3 *c1+ 3] = 1; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = 1; 
-
-    //introducing shorthand for scientific e-notation
-    float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
-    float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
-
-    float R[3*3] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
-                     1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
-                    -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
-    if( firstRunK )
-    {
-      //initialize estimated states
-      r1 = 6; c1 = 1;
-      xEstK[0 *c1+ 0] = posPend1;
-      xEstK[1 *c1+ 0] = posPend2;
-      xEstK[2 *c1+ 0] = posSled;
-      xEstK[3 *c1+ 0] = 0;
-      xEstK[4 *c1+ 0] = 0;
-      xEstK[5 *c1+ 0] = 0;
-    
-      firstRunK = false;
-    }
-
-    float y[3*1] = { posPend1, posPend2, posSled };
-   
-    //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
-    float A[6*6] = 
-      { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
-        3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
-        7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
-        0.21397   , 0.0082496 , 0,  0.9993    , -4.9467*eN5, 0       ,
-        0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
-        0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
-    //
-    float B[6*1] = { 1.1173*eN5, 1.7692*eN5, 3.5419*eN6, 
-                      0.0033502,  0.005305,   0.001062   };
-    //
-    float C[3*6] =
-      {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 ,
-        1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 ,
-        3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335  };
-    
-    //>>
-    //>>>>---prediction------------------------------------
-    //>>
-
-    /////////////////////////////////////
-    //>> xPred = A*xEstK + B*u_last  <<//
-    /////////////////////////////////////
-
-    //>> A*xEstK
-    float A_X_xEstK[6*1] = { 0 };
-    //
-    matrixMult( A_X_xEstK, A, xEstK,  6, 6, 6, 1 );
-    
-    //>> B*u_last
-    float B_X_uLast[6*1] = { 0 };
-    //
-    matrixMult( B_X_uLast, B, u_last, 6, 1, 1, 1 );
-    
-    //>> xPred = A*xEstK + B*u_last
-    float xPred[6*1] = { 0 };
-    //
-    matrixAdd( xPred, false, A_X_xEstK, B_X_uLast, 6, 1, 6, 1 );
-
-    ///////////////////////////
-    //>> Pk = A*Pk*A' + Q  <<//
-    ///////////////////////////
-    
-    //>> A*Pk
-    float A_X_Pk[6*6] = { 0 };
-    //
-    matrixMult( A_X_Pk, A, Pk, 6, 6, 6, 6 );
-    
-    //>> A'
-    float AT[6*6] = { 0 };
-    //
-    matrixTranspose( AT, A, 6, 6 );
-    
-    //>> A*Pk*A'
-    float A_X_Pk_X_AT[6*6] = { 0 };
-    //
-    matrixMult( A_X_Pk_X_AT, A_X_Pk, AT, 6, 6, 6, 6 );
-    
-    //>> Pk = A*Pk*A' + Q
-    matrixAdd( Pk, false, A_X_Pk_X_AT, Q, 6, 6, 6, 6 );
-    //old Pk was overwritten
-    
-    //>>
-    //>>>>---update----------------------------------------
-    //>>
-
-    //////////////////////////////////////
-    //>> K = Pk*C'*inv( C*Pk*C' + R ) <<//
-    //////////////////////////////////////
-    
-    //>> C'
-    float CT[6*3] = { 0 };
-    //
-    matrixTranspose( CT, C, 3, 6 );
-    
-    //>> Pk*C'
-    float Pk_X_CT[6*3] = { 0 };
-    //
-    matrixMult( Pk_X_CT, Pk, CT, 6, 6, 6, 3 );
-    
-    //>> C*Pk
-    float C_X_Pk[3*6] = { 0 };
-    //
-    matrixMult( C_X_Pk, C, Pk, 3, 6, 6, 6 );
-    
-    //>> C*Pk*C'
-    float C_X_Pk_X_CT[3*3] = { 0 };
-    //
-    matrixMult( C_X_Pk_X_CT, C_X_Pk, CT, 3, 6, 6, 3 );
-    
-    //>> C*Pk*C' + R
-    float C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
-    //
-    matrixAdd( C_X_Pk_X_CT_ADD_R, false, C_X_Pk_X_CT, R, 3, 3, 3, 3 );
-    
-    //>> inv( C*Pk*C' + R )
-    float inv_C_X_Pk_X_CT_ADD_R[3*3] = { 0 };
-    //
-    inv3x3Matrix( inv_C_X_Pk_X_CT_ADD_R, C_X_Pk_X_CT_ADD_R );
-    
-    //>> K = Pk*C'*inv( C*Pk*C' + R )
-    float K[6*3]  = { 0 };
-    //
-    matrixMult( K, Pk_X_CT, inv_C_X_Pk_X_CT_ADD_R, 6, 3, 3, 3 );
-    
-    ///////////////////////////////////////
-    //>> xEstK = xPred + K*(y - C*xPred) <<//
-    ///////////////////////////////////////
-    
-    //>> C*xPred
-    float C_X_xPred[3*1] = { 0 };
-    //
-    matrixMult( C_X_xPred, C, xPred, 3, 6, 6, 1 );
-    
-    //>> (y - C*xPred)
-    float y_SUB_C_X_xPred[3*1] = { 0 };
-    //
-    matrixAdd( y_SUB_C_X_xPred, true, y, C_X_xPred, 3, 1, 3, 1 );
-    
-    //>> K*(y - C*xPred)
-    float K_X_y_SUB_C_X_xPred[6*1] = { 0 };
-    //
-    matrixMult( K_X_y_SUB_C_X_xPred, K, y_SUB_C_X_xPred, 6, 3, 3, 1 );
-    
-    //>> xEstK = xPred + K*(y - C*xPred)
-    matrixAdd( xEstK, false, xPred, K_X_y_SUB_C_X_xPred, 6, 6, 6, 6 );
-    //xEstK was updated
-    
-    ////////////////////////
-    //>> Pk = I - K*C*Pk <<//
-    ////////////////////////
-    
-    //>> I
-    float I[6*6]  = {0};
-    r1 = 6, c1 = 6;
-    I[0 *c1+ 0] = I[1 *c1+ 1] = I[2 *c1+ 2] = 1;
-    I[3 *c1+ 3] = I[4 *c1+ 4] = I[5 *c1+ 5] = 1; 
-    
-    //>> K*C
-    float K_X_C[6*6] = { 0 };
-    //
-    matrixMult( K_X_C, K, C, 6, 3, 3, 6 );
-    
-    //>> K*C*Pk
-    float K_X_C_X_Pk[6*6] = { 0 };
-    //
-    matrixMult( K_X_C_X_Pk, K_X_C, Pk, 6, 6, 6, 6 );
-    
-    //>> Pk = I - K*C*Pk
-    float P[6*6] = { 0 };
-    //
-    matrixAdd( Pk, true, I, K_X_C_X_Pk, 6, 6, 6, 6 );
-    //Pk was updated
-    
-    //>>
-    //>>>>---Kalman filter end-----------------------------
-    //>>
-    
-    //store Kalman variables using reduced notation
-    r1 = 6, c1 = 1;
-    float x1_K = xEstK[0 *c1+ 0];
-    float x2_K = xEstK[1 *c1+ 0];
-    float x3_K = xEstK[2 *c1+ 0];
-    float x4_K = xEstK[3 *c1+ 0];
-    float x5_K = xEstK[4 *c1+ 0];
-    float x6_K = xEstK[5 *c1+ 0];
-    
-    if( tSec > testTime )
-    {
-      digitalWrite(ENABLESLED, LOW);
-      if( velSled == 0 )
-      {
-        logStop   = 1;
-        setOut    = 0; //stop logging
-      }
-    }
-    
-    //choose nr of decimals printed after decimal point
-    int deci = 5;
-
-    //output for logging
-    Serial.print( tSec,     deci );
-    Serial.print( ", "           );
-    Serial.print( posPend1, deci );
-    Serial.print( ", "           );
-    Serial.print( posPend2, deci );
-    Serial.print( ", "           );
-    Serial.print( posSled,  deci );
-    Serial.print( ", "           );
-    Serial.print( velPend1, deci );
-    Serial.print( ", "           );
-    Serial.print( velPend2, deci );
-    Serial.print( ", "           );
-    Serial.print( velSled,  deci );
-    Serial.print( ", "           );
-    Serial.print( x1_K,     deci );
-    Serial.print( ", "           );
-    Serial.print( x2_K,     deci );
-    Serial.print( ", "           );
-    Serial.print( x3_K,     deci );
-    Serial.print( ", "           );
-    Serial.print( x4_K,     deci );
-    Serial.print( ", "           );
-    Serial.print( x5_K,     deci );
-    Serial.print( ", "           );
-    Serial.print( x6_K,     deci );
-    //<<
-  } //<<<<KALMAN FILTER TEST <END<
-    //<<
   
   //////////////////////////////////////////////////////////
   ///////SET OUTPUTS////////////////////////////////////////
@@ -1451,9 +1538,10 @@ void loop()
 //
 ///////////////////////////////////////////////////////////
 
-void inv3x3Matrix( float * invM[3*3], float m[3*3] )
+void inv3x3Matrix( float invM[3*3], float m[3*3] )
 {
-  float c = 3;
+  int c = 3;
+  
   float det  = m[0 *c+ 0] * (m[1 *c+ 1]*m[2 *c+ 2] - m[1 *c+ 2] * m[2 *c+ 1]);
         det -= m[0 *c+ 1] * (m[1 *c+ 0]*m[2 *c+ 2] - m[1 *c+ 2] * m[2 *c+ 0]);
         det += m[0 *c+ 2] * (m[1 *c+ 0]*m[2 *c+ 1] - m[1 *c+ 1] * m[2 *c+ 0]);
@@ -1485,14 +1573,14 @@ void matrixTranspose( float matrixT[], float matrix[],
   }
 }
 
-void matrixAdd( float * add[], bool substract,
-                float   matrix1[],  float matrix2[],
-                int     r1, int c1, int r2, int c2  )
+void matrixAdd( float add[], bool substract,
+                float matrix1[],  float matrix2[],
+                int   r1, int c1, int r2, int c2  )
 {
   int i, j;
 
   //check if matrix dimentions match, if not: exit subroutine
-  if( c1 ~= c2 || r1 ~= r2 )
+  if( c1 != c2 || r1 != r2 )
   {
     Serial.print( "matrixAdd: Matrix Dimention Mismatch!" );
     logStop = 1;
@@ -1503,7 +1591,7 @@ void matrixAdd( float * add[], bool substract,
   {
     for( j = 0; j < c1; ++j )
     {
-      if substract
+      if( substract )
       {
         add[i *c1+ j] = matrix1[i *c1+ j] - matrix2[i *c2+ j];
       }
@@ -1522,7 +1610,7 @@ void matrixMult( float mult[],
   int i, j, k;
 
   //check if matrix dimentions match, if not: exit subroutine
-  if( c1 ~= r2 )
+  if( c1 != r2 )
   {
     Serial.print( "matrixMult: Matrix Dimention Mismatch!" );
     logStop = 1;
@@ -1566,8 +1654,6 @@ float interpolateFrictionLookup( float position[], float coloumb[], float z )
     {
         if( (position[i] <= z) && (position[i+1] >= z) )
         {
-           // Serial.print( ", "                );
-           // Serial.print( colomb[i],            5 );
             //                  z0             y0        
             return interpolate( position[i],   coloumb[i], 
                                 position[i+1], coloumb[i+1], z );
