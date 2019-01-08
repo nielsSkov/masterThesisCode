@@ -186,7 +186,7 @@ Joint pend2( 3, SAMPLINGTIME );
 
 struct firStru
 {
-  float xIn;          //   set window size here
+  float xIn;          //   set window size here,
   float buff[10];     //<--must be same size as
   int   offset;                               //
 };                                              //
@@ -309,50 +309,53 @@ void setup()
 
 void loop()
 {
-  ///////MODEL PARAMETERS////////////////////////////////////////////////////////////
+  ///////MODEL PARAMETERS/////////////////////////////////////////////////////
   //
-  //                         addjustment from
-  //         measured            estimate
-  float m1 = .100+.075+.026      +.02250;  // mass of pendulum 1          [kg]
-  float l1 = .3235               -.00658;  // length of pendulum 1        [m]
+  //                        addjustment from
+  //         measured           estimate    pendulum 1
+  float m1 = .100+.075+.026     +.02250;  //mass             [kg]
+  float l1 = .3235              -.00658;  //length           [m]
   //
-  //                          addjustment from
-  //          measured            estimate
-  float m2 = .100+.075+.026+.05  +.0132;   // mass of pendulum 2          [kg]
-  float l2 = .2                  -.0000;   // length of pendulum 2        [m]
+  //                        addjustment from
+  //          measured          estimate    pendulum 2
+  float m2 = .100+.075+.026+.05 +.0132;   //mass             [kg]
+  float l2 = .2                 -.0000;   //length           [m]
   //
   //         estimated
-  float M  = 6.28;                         // mass of cart                [kg]
+  float M  = 6.28;                        //mass of cart     [kg]
   //
   //         gravity in Denmark
-  float g  = 9.82;                         // gravitational acceleration  [m s^-2]
+  float g  = 9.82;                        //gravitational
+  //                                        acceleration     [m s^-2]
   //
   //         measured
-  float r  = 0.028;                        // radius of pulley            [m]
+  float r  = 0.028;                       //radius of pulley [m]
   //
+  //                                        cart
+  float b_c_v  = 0;                       //viscous friction [N m^-1 s]
   //
-  float b_c_v  = 0;                        // cart viscous friction       [N m^-1 s]
+  //              estimated                 pendulum 1
+  float b_p1_c = .0041;                   //coulomb friction [N m]
+  float b_p1_v = .0005;                   //viscous friction [N m s]
   //
-  //             estimated
-  float b_p1_c = .0041;                    // pendulum 1 coulomb friction [N m]
-  float b_p1_v = .0005;                    // pendulum 1 viscous friction [N m s]
-  //
-  //             estimated
-  float b_p2_c = .0057;                    // pendulum 2 coulomb friction [N m]
-  float b_p2_v = .0001;                    // pendulum 2 viscous friction [N m s]
+  //              estimated                 pendulum 2 
+  float b_p2_c = .0057;                   //coulomb friction [N m]
+  float b_p2_v = .0001;                   //viscous friction [N m s]
   //
   //             for steap slope of tanh
-  float k_tanh = 250;                      //tanh constant                [1]
+  float k_tanh = 250;                     //tanh constant    [1]
   //
-  //             from datasheet
-  float k_tau  = .0934;                    // motor torque constant       [N m A^-1]
-
-  //notation for cart pendulum (system with only one pendulum)
+  //             from datasheet             motor
+  float k_tau  = .0934;                   //torque constant  [N m A^-1]
   //
-  float l     = l1;     // .3348;
-  float m     = m1;     // .2010;
-  float b_p_c = b_p1_c; // .004;
-  float b_p_v = b_p1_v; // .0004;
+  //notation for cart pendulum system with only one pendulum
+  //
+  float l     = l1;                       //length           [m]
+  float m     = m1;                       //mass             [kg]
+  float b_p_c = b_p1_c;                   //coloumb friction [N m]
+  float b_p_v = b_p1_v;                   //viscous friction [N m s]
+  //
+  ////////////////////////////////////////////////////////////////////////////
   
   /////////////////////////////////////////////////////////
   //////SERIAL INTERFACE///////////////////////////////////
@@ -571,7 +574,7 @@ void loop()
   ///////EXPONENTIAL SMOOTHING FILTER//////////////////////
   /////////////////////////////////////////////////////////
   
-  float alpha = .8;
+  float alpha = .5;
   x3_FIR      = alpha*x3_FIR + ( 1 - alpha )*x3_last;
   x4_FIR      = alpha*x4_FIR + ( 1 - alpha )*x4_last;
   p2_FIR      = alpha*p2_FIR + ( 1 - alpha )*p2_FIR_last;
@@ -649,11 +652,8 @@ void loop()
       float Q[r1*c1]  = { 0 };
       //
       //setting diagonal elements of Q
-      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 2; Q[2 *c1+ 2] = .1;
-      Q[3 *c1+ 3] = 4.5; Q[4 *c1+ 4] = 4.5; Q[5 *c1+ 5] = 3; 
-
-//      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1;
-//      Q[3 *c1+ 3] = .5; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = .07; 
+      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1; 
+      Q[3 *c1+ 3] = 1; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = 1; 
 
       //introducing shorthand for scientific e-notation
       float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
@@ -667,8 +667,8 @@ void loop()
   //                     1.2205*eN8 ,  .01,        -3.1029*eN9  ,
   //                    -3.5968*eN10, -3.1029*eN9,  .01          };
       //!!!!ONLY FOR TUNING OF KF!!!!!!!!
-  //    pos1Wrap = posPend1 -PI; //!!!!!!!!
-  //   pos2Wrap = posPend2 -PI; //!!!!!!!!
+     // pos1Wrap = posPend1 -PI; //!!!!!!!!
+     // pos2Wrap = posPend2 -PI; //!!!!!!!!
       //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
       if( firstRunK )
@@ -677,7 +677,7 @@ void loop()
         r1 = 6; c1 = 1;
         xEstK[0 *c1+ 0] = pos1Wrap;
         xEstK[1 *c1+ 0] = pos2Wrap;
-        xEstK[2 *c1+ 0] = posSled;
+        xEstK[2 *c1+ 0] = posSled-.38;
         xEstK[3 *c1+ 0] = x3_FIR;
         xEstK[4 *c1+ 0] = p2_FIR;
         xEstK[5 *c1+ 0] = x4_FIR;
@@ -685,7 +685,7 @@ void loop()
         firstRunK = false;
       }
 
-      float y[3*1] = { pos1Wrap, pos2Wrap, posSled };
+      float y[3*1] = { pos1Wrap, pos2Wrap, posSled-.38 };
      
       //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
       float A[6*6] = 
@@ -872,7 +872,7 @@ void loop()
       //>>>>---Kalman filter end-----------------------------
       //>>
       
-      //store Kalman variables using reduced notation
+      //store Kalman states using reduced notation
       r1 = 6, c1 = 1;
       x1 = xEstK[0 *c1+ 0];
       x2 = xEstK[1 *c1+ 0];
@@ -881,10 +881,6 @@ void loop()
       x5 = xEstK[4 *c1+ 0];
       x6 = xEstK[5 *c1+ 0];
       
-      //since KF only works in zero
-      x1Wrap = x1;
-      x2Wrap = x2;
- 
       //
       //
       //
@@ -896,31 +892,31 @@ void loop()
       float tSec = float(float(time_stamp)/1000000);  // [s]
       //
       //output for logging
-      Serial.print( tSec,     deci );
-      Serial.print( ", "           );
-      Serial.print( pos1Wrap, deci );
-      Serial.print( ", "           );
-      Serial.print( pos2Wrap, deci );
-      Serial.print( ", "           );
-      Serial.print( posSled,  deci );
-      Serial.print( ", "           );
-      Serial.print( velPend1, deci );
-      Serial.print( ", "           );
-      Serial.print( velPend2, deci );
-      Serial.print( ", "           );
-      Serial.print( velSled,  deci );
-      Serial.print( ", "           );
-      Serial.print( x1,       deci );
-      Serial.print( ", "           );
-      Serial.print( x2,       deci );
-      Serial.print( ", "           );
-      Serial.print( x3,       deci );
-      Serial.print( ", "           );
-      Serial.print( x4,       deci );
-      Serial.print( ", "           );
-      Serial.print( x5,       deci );
-      Serial.print( ", "           );
-      Serial.print( x6,       deci );
+      Serial.print( tSec,        deci );
+      Serial.print( ", "              );
+      Serial.print( pos1Wrap,    deci );
+      Serial.print( ", "              );
+      Serial.print( pos2Wrap,    deci );
+      Serial.print( ", "              );
+      Serial.print( posSled-.38, deci );
+      Serial.print( ", "              );
+      Serial.print( velPend1,    deci );
+      Serial.print( ", "              );
+      Serial.print( velPend2,    deci );
+      Serial.print( ", "              );
+      Serial.print( velSled,     deci );
+      Serial.print( ", "              );
+      Serial.print( x1,          deci );
+      Serial.print( ", "              );
+      Serial.print( x2,          deci );
+      Serial.print( ", "              );
+      Serial.print( x3,          deci );
+      Serial.print( ", "              );
+      Serial.print( x4,          deci );
+      Serial.print( ", "              );
+      Serial.print( x5,          deci );
+      Serial.print( ", "              );
+      Serial.print( x6,          deci );
       logStop = 1;
       //
       //
@@ -958,7 +954,53 @@ void loop()
         x2Wrap = float(x2Wrap + float(2*PI));
       }
       x2Wrap = float(x2Wrap - PI);
-
+      //
+      //
+      //
+      //
+      //
+      int deci = 5;
+      //
+      //time converted from micro sec to sec
+      float tSec = float(float(time_stamp)/1000000);  // [s]
+      //
+      //output for logging
+      Serial.print( tSec,        deci );
+      Serial.print( ", "              );
+      Serial.print( x1Wrap,      deci );
+      Serial.print( ", "              );
+      Serial.print( x2Wrap,      deci );
+      Serial.print( ", "              );
+      Serial.print( posSled-.38, deci );
+      Serial.print( ", "              );
+      Serial.print( velPend1,    deci );
+      Serial.print( ", "              );
+      Serial.print( velPend2,    deci );
+      Serial.print( ", "              );
+      Serial.print( velSled,     deci );
+      Serial.print( ", "              );
+      Serial.print( x1,          deci );
+      Serial.print( ", "              );
+      Serial.print( x2,          deci );
+      Serial.print( ", "              );
+      Serial.print( x3,          deci );
+      Serial.print( ", "              );
+      Serial.print( x4,          deci );
+      Serial.print( ", "              );
+      Serial.print( x5,          deci );
+      Serial.print( ", "              );
+      Serial.print( x6,          deci );
+      logStop = 1;
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      //
+      current_x     = x3;  //x
+      current_x_dot = x6;  //x_dot
     }
     current_x     = x3;  //x
     current_x_dot = x6;  //x_dot
@@ -1185,7 +1227,7 @@ void loop()
       //linear control of cart position
       float lin_u =  -k_lin[0]*x2 -k_lin[1]*x4;
       
-      //final control out put, energy control with position control
+      //final control output, energy control with position control
       u = ( M + m )*a_c + m*l*sin(x1_FIR)*x3_FIR*x3_FIR -m*l*cos(x1_FIR)*theta_acc_est + lin_u;
       
       //calculated needed armature current, i_a, to achieve control, u
@@ -1282,7 +1324,7 @@ void loop()
           -kLQR[3]*x4 -kLQR[4]*x5 -kLQR[5]*x6;
       
       //option to set current limit peak
-      if(1)
+      if(0)
       {
         float i_peak_limit = 8;
         float u_peak_limit = i_peak_limit*k_tau/r;
@@ -1296,6 +1338,8 @@ void loop()
       
       //calculating required current to obtain control, u
       setOutSled = u*r/k_tau;
+      
+      u_last = u;
 
       //<<
     } //<<<<CATCH <END<
@@ -1310,7 +1354,66 @@ void loop()
       //set narrow catch angle to provide
       //best handover to sliding mode
       catchAngleTwin = 0.1;
+
+      //energy control gains
+      float k1 = 9.5;
+      float k2 = 4.2;
+       
+      //extra energy offset from equilibrium to get fast catch
+      float E_off1 = -.00;//.022;
+      float E_off2 = -.02;//.022;
       
+      //inertias
+      float J1 = m1*(l1*l1);
+      float J2 = m2*(l2*l2);
+      
+      //energy error
+      float E_delta1 = .5*J1*(x4*x4) + m1*g*l1*(cos(x1) - 1) + E_off1;
+      float E_delta2 = .5*J2*(x5*x5) + m2*g*l2*(cos(x2) - 1) + E_off2;
+
+      float G = k1*m1*l1*E_delta1*cos(x1)*x4 + k2*m2*l2*E_delta2*cos(x2)*x5;
+
+      //energy control law (acceleration of cart)
+      float a_c = -G;
+      
+      //calculate maximum acceleration of cart
+      float i_max = 4.58+.5;
+      float u_max = i_max*k_tau/r;
+      float a_max = u_max/(M + m1 + m2);
+      
+      //saturation
+      if(      a_c >  a_max ){ a_c =  a_max; }
+      else if( a_c < -a_max ){ a_c = -a_max; } //a_c = -G otherwise
+
+      //estimation of needed actuation to achieve cart acceleration, a_c
+      float theta1_acc_est =
+        -(b_p1_v*l2*m1*x4 + b_p1_v*l2*m2*x4 + M*b_p1_c*l2*tanh(k_tanh*x4)
+        + b_p1_c*l2*m1*tanh(k_tanh*x4) + b_p1_c*l2*m2*tanh(k_tanh*x4)
+        + M*b_p1_v*l2*x4 - b_p1_v*l2*m2*x4*cos(x2)*cos(x2)
+        - g*l1*l2*m1*m1*sin(x1) - b_p1_c*l2*m2*tanh(k_tanh*x4)*cos(x2)*cos(x2)
+        - l1*l2*m1*u_last*cos(x1) + l1*l1*l2*m1*m1*x4*x4*cos(x1)*sin(x1)
+        + b_p2_c*l1*m1*tanh(k_tanh*x5)*cos(x1)*cos(x2)
+        - M*g*l1*l2*m1*sin(x1) - g*l1*l2*m1*m2*sin(x1)
+        + b_p2_v*l1*m1*x5*cos(x1)*cos(x2)
+        + l1*l2*l2*m1*m2*x5*x5*cos(x1)*sin(x2)
+        + g*l1*l2*m1*m2*cos(x2)*cos(x2)*sin(x1)
+        - g*l1*l2*m1*m2*cos(x1)*cos(x2)*sin(x2))/
+        (l1*l1*l2*m1*(M + m1 + m2 - m1*cos(x1)*cos(x1) - m2*cos(x2)*cos(x2)));
+    
+      float theta2_acc_est =
+        -(b_p2_v*l1*m1*x5 + b_p2_v*l1*m2*x5 + M*b_p2_c*l1*tanh(k_tanh*x5)
+        + b_p2_c*l1*m1*tanh(k_tanh*x5) + b_p2_c*l1*m2*tanh(k_tanh*x5)
+        + M*b_p2_v*l1*x5 - b_p2_v*l1*m1*x5*cos(x1)*cos(x1)
+        - g*l1*l2*m2*m2*sin(x2) - b_p2_c*l1*m1*tanh(k_tanh*x5)*cos(x1)*cos(x1)
+        - l1*l2*m2*u_last*cos(x2) + l1*l2*l2*m2*m2*x5*x5*cos(x2)*sin(x2)
+        + b_p1_c*l2*m2*tanh(k_tanh*x4)*cos(x1)*cos(x2)
+        - M*g*l1*l2*m2*sin(x2) - g*l1*l2*m1*m2*sin(x2)
+        + b_p1_v*l2*m2*x4*cos(x1)*cos(x2)
+        + l1*l1*l2*m1*m2*x4*x4*cos(x2)*sin(x1)
+        + g*l1*l2*m1*m2*cos(x1)*cos(x1)*sin(x2)
+        - g*l1*l2*m1*m2*cos(x1)*cos(x2)*sin(x1))
+        /(l1*l2*l2*m2*(M + m1 + m2 - m1*cos(x1)*cos(x1) - m2*cos(x2)*cos(x2)));  
+
       //gain for x-control
       float k_lin[] = { 10.5460, 15.8190 };
       
@@ -1318,10 +1421,18 @@ void loop()
       float lin_u =  -k_lin[1]*x3 -k_lin[1]*x6;
       
       //final control output, energy control with position control
-      u = 0;// + lin_u;
+      u = (M+m1+m2)*a_c
+        + m1*l1*sin(x1)*(x4*x4) - m1*l1*cos(x1)*theta1_acc_est
+        + m2*l2*sin(x2)*(x5*x5) - m2*l2*cos(x2)*theta2_acc_est + lin_u;
       
-      //calculated needed armature current, i_a, to achieve control, u
+      //setting max output in one direction for the
+      //first 0.1 s to start the swing-up procecure
+      if( tSec < 0.1 ){  u = u_max;  }
+      
+      //calculating needed armature current, i_a, to achieve control, u
       setOutSled = u*r/k_tau;
+      
+      u_last = u;
       
       //<<
     } //<<<<SWING-UP <END<
@@ -1701,7 +1812,7 @@ float cartFrictionCompensation( float b_c_c, float b_c_v, float x4,
   float x4_0 = x4;
   if( (x4_0 < .1) && (x4_0 > -.1 )){ x4_0 = 0; }
   
-  float frictionComp = r / k_tau *( (sat_x4*(b_c_c)) + x4_0*b_c_v*0 );
+  float frictionComp = r / k_tau *( (sgn_x4*(b_c_c)) + x4_0*b_c_v*0 );
   
   return frictionComp;
 }
