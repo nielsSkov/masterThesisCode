@@ -1,0 +1,2 @@
+gcc csvRead.c -o csvRead
+gcc kalmanFilter.c -o cKalman -lm

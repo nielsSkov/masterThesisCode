@@ -244,7 +244,32 @@ bool   first_run        = true;
 
 //for Kalman initialization
 float xEstK[6*1] = { 0 };
-float    Pk[6*6] = { 0 };
+float    Pk[6*6] =
+  { 0.163251449842,  -0.000181879547,   -0.000002932546,   -48.984720791602,     0.054038618604,      0.000699102084,
+   -0.000181879547,   0.159001471489,   -0.000004416835,     0.054039639205,   -47.750046527928,      0.001091223281,
+   -0.000002932546,  -0.000004416835,    1.667500534233,     0.001032217157,     0.001596758435,   -499.999990015207,
+  -48.984720791602,   0.054039639205,    0.001032217157, 14698.472855758520,   -15.650695499102,     -0.194565356555,
+    0.054038618604, -47.750046527928,    0.001596758435,   -15.650695499102, 14340.624691169911,     -0.300709145006,
+    0.000699102084,   0.001091223281, -499.999990015207,    -0.194565356555,    -0.300709145006, 149925.001515453070 };
+//  { 8.3646, -16.2465, -0.0954, 47.0123, -111.2721, -0.5543,
+//    -54.7153, 73.8657, 0.6319, -347.1681, 493.2904, 2.8721,
+//    -0.2809, 0.3836, -0.0007, -1.5906, 2.5508, 0.0044,
+//    43.2462, -84.6688, -0.4986, 276.5825, -578.5997, -2.9748,
+//    -370.1628, 495.9861, 4.2705, -2348.8125, 3359.3589, 19.5091,
+//    -2.4248, 3.0537, 0.0214, -15.3762, 20.6378, 1.1226 };
+//  { -0.00173, -0.00003,  0      , -0.01122, -0.00031, -0.00005,
+//     0.01279, -0.00236,  0      , -1.01884, -0.01782, -0.00015,
+//     0.00003,  0      , -0.00127,  0.00007, -0.00001, -0.00668,
+//    -0.01373, -0.00027, -0.00001,  0.99958, -0.00001,  0      ,
+//     0.04284, -0.01892,  0      , -0.01875,  0.99968,  0      ,
+//     0.00029, -0.00007, -0.01001, -0.00006,  0      ,  0.99993 };
+
+//  {    .013507,  -.00013033, -.000015165,  -4.0527,  .038989, .0045165,
+//    -.00013033,     .010527, -.000018126,  .038989,  -3.1612, .0053958,
+//   -.000015165, -.000018126,     .016671, .0045507, .0054428,  -4.9988,
+//       -4.0527,     .038989,    .0045507,     1216,  -11.663,  -1.3553,
+//       .038989,     -3.1612,    .0054428,  -11.663,   949.41,  -1.6205,
+//      .0045165,    .0053958,     -4.9988,  -1.3553,  -1.6205,   1498.9 };
 bool  firstRunK   = true;
  
 
@@ -377,6 +402,20 @@ void loop()
     
       //reset Kalman
       firstRunK = true;
+      float PkTmp[] =
+        { 0.163251449842,  -0.000181879547,   -0.000002932546,   -48.984720791602,     0.054038618604,      0.000699102084,
+         -0.000181879547,   0.159001471489,   -0.000004416835,     0.054039639205,   -47.750046527928,      0.001091223281,
+         -0.000002932546,  -0.000004416835,    1.667500534233,     0.001032217157,     0.001596758435,   -499.999990015207,
+        -48.984720791602,   0.054039639205,    0.001032217157, 14698.472855758520,   -15.650695499102,     -0.194565356555,
+          0.054038618604, -47.750046527928,    0.001596758435,   -15.650695499102, 14340.624691169911,     -0.300709145006,
+          0.000699102084,   0.001091223281, -499.999990015207,    -0.194565356555,    -0.300709145006, 149925.001515453070 };
+//        { 8.3646, -16.2465, -0.0954, 47.0123, -111.2721, -0.5543,
+//         -54.7153, 73.8657, 0.6319, -347.1681, 493.2904, 2.8721,
+//         -0.2809, 0.3836, -0.0007, -1.5906, 2.5508, 0.0044,
+//          43.2462, -84.6688, -0.4986, 276.5825, -578.5997, -2.9748,
+//         -370.1628, 495.9861, 4.2705, -2348.8125, 3359.3589, 19.5091,
+//         -2.4248, 3.0537, 0.0214, -15.3762, 20.6378, 1.1226 };
+      for( int i = 0; i < 6*6-1; i++ ){ Pk[i] = PkTmp[i]; }
     }
     ///////Swing-Up and Sliding Mode///////////////////////
     else if( input == "1" )
@@ -592,7 +631,8 @@ void loop()
   float current_x     = 0;
   float current_x_dot = 0;
   //
-  float x1 = 0, x2 = 0, x3 = 0, x4 = 0, x5 = 0, x6 = 0;
+  float x1  = 0, x2  = 0, x3  = 0, x4  = 0, x5  = 0, x6  = 0;
+  float x1K = 0, x2K = 0, x3K = 0, x4K = 0, x5K = 0, x6K = 0;
   //
   float x1Wrap = 0, x2Wrap = 0;
   
@@ -613,21 +653,21 @@ void loop()
       //
       //
       //
-        //creating wrapped vertion of measured theta1 for KF
-        float pos1Wrap = float(fmod( float(posPend1 + PI), float(2*PI) ));
-        if( pos1Wrap < 0 )
-        {
-          pos1Wrap = float(pos1Wrap + float(2*PI));
-        }
-        pos1Wrap = float(pos1Wrap - PI);
-        
-        //creating wrapped vertion of measured theta2 for KF
-        float pos2Wrap = float(fmod( float(posPend2 + PI), float(2*PI) ));
-        if( pos2Wrap < 0 )
-        {
-          pos2Wrap = float(pos2Wrap + float(2*PI));
-        }
-        pos2Wrap = float(pos2Wrap - PI);
+      //creating wrapped vertion of measured theta1 for KF
+      float pos1Wrap = float(fmod( float(posPend1 + PI), float(2*PI) ));
+      if( pos1Wrap < 0 )
+      {
+        pos1Wrap = float(pos1Wrap + float(2*PI));
+      }
+      pos1Wrap = float(pos1Wrap - PI);
+      
+      //creating wrapped vertion of measured theta2 for KF
+      float pos2Wrap = float(fmod( float(posPend2 + PI), float(2*PI) ));
+      if( pos2Wrap < 0 )
+      {
+        pos2Wrap = float(pos2Wrap + float(2*PI));
+      }
+      pos2Wrap = float(pos2Wrap - PI);
       //
       //
       //
@@ -652,25 +692,26 @@ void loop()
       float Q[r1*c1]  = { 0 };
       //
       //setting diagonal elements of Q
-      Q[0 *c1+ 0] = 1; Q[1 *c1+ 1] = 1; Q[2 *c1+ 2] = 1; 
-      Q[3 *c1+ 3] = 1; Q[4 *c1+ 4] = 1; Q[5 *c1+ 5] = 1; 
+      Q[0 *c1+ 0] = 10;   Q[1 *c1+ 1] = 10;   Q[2 *c1+ 2] = 10; 
+      Q[3 *c1+ 3] = 1000; Q[4 *c1+ 4] = 1000; Q[5 *c1+ 5] = 100000; 
 
       //introducing shorthand for scientific e-notation
       float eN5 = pow(10,-5); float eN6 = pow(10,-6); float eN7  = pow(10,- 7);
       float eN8 = pow(10,-8); float eN9 = pow(10,-9); float eN10 = pow(10,-10);
 
-      float R[3*3] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
-                       1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
-                      -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
+      float R[3*3] = 
+        { 0.000003004588387, 0.000004480884893, 0.000000676711753,
+          0.000004480884893, 0.000007922412675, 0.000001200581026,
+          0.000000676711753, 0.000001200581026, 0.000000200792964 };
+
+  //  float R[3*3] = { 7.7114*eN7 ,  1.2205*eN8, -3.5968*eN10,
+  //                   1.2205*eN8 ,  9.2307*eN7, -3.1029*eN9 ,
+  //                  -3.5968*eN10, -3.1029*eN9,  1.0616*eN9   };
       
   //    float R[3*3] = { .01,          1.2205*eN8, -3.5968*eN10 ,
   //                     1.2205*eN8 ,  .01,        -3.1029*eN9  ,
   //                    -3.5968*eN10, -3.1029*eN9,  .01          };
-      //!!!!ONLY FOR TUNING OF KF!!!!!!!!
-     // pos1Wrap = posPend1 -PI; //!!!!!!!!
-     // pos2Wrap = posPend2 -PI; //!!!!!!!!
-      //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
+ 
       if( firstRunK )
       {
         //initialize estimated states
@@ -688,45 +729,42 @@ void loop()
       float y[3*1] = { pos1Wrap, pos2Wrap, posSled-.38 };
      
       //defining discrete state space linearized around x = [ 0 0 0 0 0 0 ]';
+//      float A[6*6] = 
+//        { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
+//          3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
+//          7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
+//          0.21397   , 0.0082496 , 0,  0.9993    , -4.9467*eN5, 0       ,
+//          0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
+//          0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
       float A[6*6] = 
-        { 1.0007    , 2.7512*eN5, 0,  0.0066677 , -1.6497*eN7, 0       ,
-          3.8817*eN5, 1.0011    , 0, -1.2727*eN7,  0.0066632 , 0       ,
-          7.7711*eN6, 8.7217*eN6, 1, -2.5479*eN8, -5.2298*eN8, 0.00667 ,
-          0.21397   , 0.0082496 , 0,  0.9993    , -4.9467*eN5, 0       ,
-          0.011639  , 0.34024   , 0, -3.8162*eN5,  0.99796   , 0       ,
-          0.0023302 , 0.0026152 , 0, -7.64  *eN6, -1.5681*eN5, 1         };
+        { 1.000713584960613,   0.000027512471459,                   0,   0.006667662014417,  -0.000000164973290,                   0,
+          0.000038817329540,   1.001134697178922,                   0,  -0.000000127271579,   0.006663197672182,                   0,
+          0.000007771088754,   0.000008721656425,   1.000000000000000,  -0.000000025479309,  -0.000000052297750,   0.006670001667500,
+          0.213968450439665,   0.008249614567048,                   0,   0.999298455022885,  -0.000049467241072,                   0,
+          0.011639376262599,   0.340238949099787,                   0,  -0.000038162382991,   0.997959822003739,                   0,
+          0.002330160962757,   0.002615188679131,                   0,  -0.000007639970827,  -0.000015681480364,   1.000000000000000 };
       //
-      float B[6*1] = { 1.1173*eN5,
-                       1.7692*eN5,
-                       3.5419*eN6, 
-                       0.0033502 ,
-                       0.005305  ,
-                       0.001062   };
+//      float B[6*1] = { 1.1173*eN5,
+//                       1.7692*eN5,
+//                       3.5419*eN6, 
+//                       0.0033502 ,
+//                       0.005305  ,
+//                       0.001062   };
+      float B[6*1] = { 0.000011173020989,
+                       0.000017692278595,
+                       0.000003541930082,
+                       0.003350230343635,
+                       0.005305029736718,
+                       0.001062047735194 }; 
       //
+//      float C[3*6] =
+//        {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 ,
+//          1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 ,
+//          3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335  };
       float C[3*6] =
-        {     1.0004, 1.3756*eN5, 0,  0.0033338 , -8.2487*eN8,        0 ,
-          1.9409*eN5,     1.0006, 0, -6.3636*eN8,  0.0033316 ,        0 ,
-          3.8855*eN6, 4.3608*eN6, 1, -1.274 *eN8, -2.6149*eN8, 0.003335  };
-
-//  float A[6*6] =
-//    {  0.999278670524648, -0.000033049478648, 0  ,  0.006667051793694, -0.000000139829971,                 0,
-//      -0.000051190549469,  0.998856234051542, 0  , -0.000000200330457,  0.006664965758812,                 0,
-//       0.000010245505110,  0.000010477815032, 1.0,  0.000000040095032,  0.000000044330883, 0.006670001667500,
-//      -0.216290643184279, -0.009909886172465, 0  ,  0.999115480339056, -0.000041928016745,                 0,
-//      -0.015349486258402, -0.342958219645077, 0  , -0.000060069087566,  0.998489982779698,                 0,
-//       0.003072114707328,  0.003141772837196, 0  ,  0.000012022495363,  0.000013292615256, 1.000000000000000 };
-//  float B[6*1] =
-//    { -0.000011172065162,
-//      -0.000017696850887,
-//       0.000003541926744,
-//      -0.003349943738961,
-//      -0.005306400738433,
-//       0.001062046734144 };
-//  float C[3*6] =
-//    {  0.999639335262324, -0.000016524739324, 0  ,  0.003333525896847, -0.000000069914985,                 0,
-//      -0.000025595274735,  0.999428117025771, 0  , -0.000000100165229,  0.003332482879406,                 0,
-//       0.000005122752555,  0.000005238907516, 1.0,  0.000000020047516,  0.000000022165441, 0.003335000833750 };
-//
+        { 1.000356792480306,   0.000013756235730,                   0,   0.003333831007208,  -0.000000082486645,                   0,
+          0.000019408664770,   1.000567348589461,                   0,  -0.000000063635790,   0.003331598836091,                   0,
+          0.000003885544377,   0.000004360828213,   1.000000000000000,  -0.000000012739655,  -0.000000026148875,   0.003335000833750 };
  
       //>>
       //>>>>---prediction------------------------------------
@@ -754,6 +792,7 @@ void loop()
       matrixAdd( xPred, false, A_X_xEstK, B_X_uLast, 6, 1, 6, 1 );
 
       ///////////////////////////
+
       //>> Pk = A*Pk*A' + Q  <<//
       ///////////////////////////
       
@@ -874,12 +913,12 @@ void loop()
       
       //store Kalman states using reduced notation
       r1 = 6, c1 = 1;
-      x1 = xEstK[0 *c1+ 0];
-      x2 = xEstK[1 *c1+ 0];
-      x3 = xEstK[2 *c1+ 0];
-      x4 = xEstK[3 *c1+ 0];
-      x5 = xEstK[4 *c1+ 0];
-      x6 = xEstK[5 *c1+ 0];
+      x1K = xEstK[0 *c1+ 0];
+      x2K = xEstK[1 *c1+ 0];
+      x3K = xEstK[2 *c1+ 0];
+      x4K = xEstK[3 *c1+ 0];
+      x5K = xEstK[4 *c1+ 0];
+      x6K = xEstK[5 *c1+ 0];
       
       //
       //
@@ -891,33 +930,6 @@ void loop()
       //time converted from micro sec to sec
       float tSec = float(float(time_stamp)/1000000);  // [s]
       //
-      //output for logging
-      Serial.print( tSec,        deci );
-      Serial.print( ", "              );
-      Serial.print( pos1Wrap,    deci );
-      Serial.print( ", "              );
-      Serial.print( pos2Wrap,    deci );
-      Serial.print( ", "              );
-      Serial.print( posSled-.38, deci );
-      Serial.print( ", "              );
-      Serial.print( velPend1,    deci );
-      Serial.print( ", "              );
-      Serial.print( velPend2,    deci );
-      Serial.print( ", "              );
-      Serial.print( velSled,     deci );
-      Serial.print( ", "              );
-      Serial.print( x1,          deci );
-      Serial.print( ", "              );
-      Serial.print( x2,          deci );
-      Serial.print( ", "              );
-      Serial.print( x3,          deci );
-      Serial.print( ", "              );
-      Serial.print( x4,          deci );
-      Serial.print( ", "              );
-      Serial.print( x5,          deci );
-      Serial.print( ", "              );
-      Serial.print( x6,          deci );
-      logStop = 1;
       //
       //
       //
@@ -926,11 +938,9 @@ void loop()
       //
       //
       //
-      current_x     = x3;  //x
-      current_x_dot = x6;  //x_dot
-    }
-    else //if swing-up twin
-    {
+   // }
+   // else //if swing-up twin
+   // {
       //change coordinate convention
       x1 = x1_FIR; //theta1
       x2 = p2;     //theta2
@@ -957,19 +967,12 @@ void loop()
       //
       //
       //
-      //
-      //
-      int deci = 5;
-      //
-      //time converted from micro sec to sec
-      float tSec = float(float(time_stamp)/1000000);  // [s]
-      //
       //output for logging
       Serial.print( tSec,        deci );
       Serial.print( ", "              );
-      Serial.print( x1Wrap,      deci );
+      Serial.print( pos1Wrap,    deci );
       Serial.print( ", "              );
-      Serial.print( x2Wrap,      deci );
+      Serial.print( pos2Wrap,    deci );
       Serial.print( ", "              );
       Serial.print( posSled-.38, deci );
       Serial.print( ", "              );
@@ -979,47 +982,97 @@ void loop()
       Serial.print( ", "              );
       Serial.print( velSled,     deci );
       Serial.print( ", "              );
-      Serial.print( x1,          deci );
+      Serial.print( u_last,      deci );
       Serial.print( ", "              );
-      Serial.print( x2,          deci );
+      Serial.print( x1K,         deci );
       Serial.print( ", "              );
-      Serial.print( x3,          deci );
+      Serial.print( x2K,         deci );
       Serial.print( ", "              );
-      Serial.print( x4,          deci );
+      Serial.print( x3K,         deci );
       Serial.print( ", "              );
-      Serial.print( x5,          deci );
+      Serial.print( x4K,         deci );
       Serial.print( ", "              );
-      Serial.print( x6,          deci );
+      Serial.print( x5K,         deci );
+      Serial.print( ", "              );
+      Serial.print( x6K,         deci );
+
+//      Serial.print( ", "              );
+//      Serial.print( Pk[0],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[1],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[2],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[3],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[4],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[5],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[6],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[7],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[8],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[9],       deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[10],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[11],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[12],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[13],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[14],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[15],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[16],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[17],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[18],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[19],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[20],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[21],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[22],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[23],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[24],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[25],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[26],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[27],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[28],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[29],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[30],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[31],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[32],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[33],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[34],      deci );
+//      Serial.print( ", "              );
+//      Serial.print( Pk[35],      deci );
+      
       logStop = 1;
-      //
-      //
-      //
-      //
-      //
-      //
-      //
-      //
-      current_x     = x3;  //x
-      current_x_dot = x6;  //x_dot
     }
     current_x     = x3;  //x
     current_x_dot = x6;  //x_dot
-    
-    //creating wrapped vertion of theta1 for catch
-    x1Wrap = float(fmod( float(x1 + PI), float(2*PI) ));
-    if( x1Wrap < 0 )
-    {
-      x1Wrap = float(x1Wrap + float(2*PI));
-    }
-    x1Wrap = float(x1Wrap - PI);
-    
-    //creating wrapped vertion of theta2 for catch
-    x2Wrap = float(fmod( float(x2 + PI), float(2*PI) ));
-    if( x2Wrap < 0 )
-    {
-      x2Wrap = float(x2Wrap + float(2*PI));
-    }
-    x2Wrap = float(x2Wrap - PI);
   }
   else
   {
@@ -1311,20 +1364,34 @@ void loop()
     //
     else if( (abs(x1Wrap)+abs(x2Wrap)) < catchAngleTwin  )
     {
-      twinCatch = true;
+  //    x1 = x1K;  
+  //    x2 = x2K;  
+  //    x3 = x3K;  
+  //    x4 = x4K;  
+  //    x5 = x5K;  
+  //    x6 = x6K;  
+ 
+     twinCatch = true;
 
       //set wider catch angle to stay in stabilization after wing-up sequence 
       catchAngleTwin = 0.8;
       
       //LQR gain vector
-      float kLQR[] = { -2005.64, 1823.86, 27.31, -354.10, 249.88, 37.16 };
-
+  //  float kLQR[] = { -2005.64, 1823.86, 27.31, -354.10, 249.88,  37.16 };
+  //  float kLQR[] = { -2157.42, 1916.46, 18.02, -387.96, 273.14, 45.06  }; 
+  //  float kLQR[] = { -2571.46, 2245.18, 17.88, -462.34, 320.05, 58.54  }; 
+  //  float kLQR[] = { -3836.28, 3249.81, 17.44, -689.56, 463.42, 99.59  }; 
+  //  float kLQR[] = { -3835.55, 3249.11, 17.44, -689.43, 463.32, 99.59  }; 
+  //  float kLQR[] = { -4030.09, 3380.02, 43.55, -724.38, 482.01, 118.07 }; 
+      float kLQR[] = { -2815.13, 2414.30, 44.61, -506.12, 344.19, 78.97  }; 
+  //  float kLQR[] = { -1961.50, 1760.96, 18.09, -352.77, 250.95, 38.66  };
+  //  float kLQR[] = { -4956.63, 4080.16, 85.82, -890.84, 581.94, 167.29 };
       //LQR
       u = -kLQR[0]*x1 -kLQR[1]*x2 -kLQR[2]*x3
           -kLQR[3]*x4 -kLQR[4]*x5 -kLQR[5]*x6;
       
       //option to set current limit peak
-      if(0)
+      if(1)
       {
         float i_peak_limit = 8;
         float u_peak_limit = i_peak_limit*k_tau/r;
