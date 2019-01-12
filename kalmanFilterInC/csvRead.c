@@ -2,11 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BUFFER_SIZE 8000
+#define BUFFER_SIZE 80
 
 int main()
 {
-	char filename[] = "tuneKF4.csv";
+  char *homedir      = getenv("HOME");
+  char *pathFromHome = "/thesis/code/kalmanFilterInC/";
+  char *file         = "test.csv";
+
+  char inputFile[100];
+  strcpy( inputFile, homedir );
+  strcat( inputFile, pathFromHome );
+  strcat( inputFile, file );
+  
 	char buffer[BUFFER_SIZE];
 	FILE *f;
 	char *field;
@@ -21,18 +29,18 @@ int main()
   float u_last   = 0; 
 
 	//opening csv file
-	f = fopen( filename, "r" );
+	f = fopen( inputFile, "r" );
 	//
   if( f == NULL)
 	{
-		printf("unable to open csv-file '%s'\n",filename);
+		printf( "unable to open csv-file '%s'\n", inputFile );
 		exit(1);
 	}
 
 	while( fgets( buffer, BUFFER_SIZE, f ) )
 	{
 		           field = strtok( buffer, "," );
-    tSec     = atoi( field );
+    tSec     = atof( field );
  
                field = strtok( NULL, "," );
     posPend1 = atof( field );
@@ -48,6 +56,9 @@ int main()
 
                field = strtok( NULL, "," );
     velPend2 = atof( field );
+
+               field = strtok( NULL, "," );
+    velSled  = atof( field );
 
                field = strtok( NULL, "," );
     u_last   = atof( field );
