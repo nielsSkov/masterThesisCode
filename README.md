@@ -1,4 +1,4 @@
-# Code for Cart Pendulum and Twing Pendulum System
+# Code for Cart Pendulum and Twin Pendulum System
   
 Before uploading FIRST time:  
 - Remember to add the library Joint_teensy.h  
