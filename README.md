@@ -15,14 +15,14 @@ OBS: The cart must be at the right side of the rail @ each upload!
   
 -------SERIAL INTERFACE----------------------------------------  
   
-r - Reset Pendulum Refference  
+r - \*Reset Pendulum Refference  
 f - Friction Compensation Only  
   
 0 - Stop all  
   
 1 - Swing-Up and Sliding Mode  
-2 - **Twin Swing-Up and Catch with LQR  
-3 - **Twin Swing-Up and Catch with Sliding Mode  
+2 - \*\*Twin Swing-Up and Catch with LQR  
+3 - \*\*Twin Swing-Up and Catch with Sliding Mode  
   
 5 - Cart Mass and Friction Estimation  
 6 - Pendulum (1 & 2) Friction Estimation  
