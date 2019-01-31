@@ -1,8 +1,8 @@
 # Code for Cart Pendulum and Twing Pendulum System
   
 Before uploading FIRST time:  
-  -Remember to add the library Joint_teensy.h  
-    > Sketch - Import Library - Add Library  
+- Remember to add the library Joint_teensy.h  
+  > Sketch - Import Library - Add Library  
   
 In general before upload remember:  
 - Check:  
