@@ -27,15 +27,15 @@ f - Friction Compensation Only
 5 - Cart Mass and Friction Estimation  
 6 - Pendulum (1 & 2) Friction Estimation  
 
-\* only the pendulums are reset for input 'r', however,  
-   it is possible to enable cart position reset with 'r'  
-   by uncommenting // cart.resetPos();  
-   currently the cart is only reset at each new upload,  
-   ( this allows resetting the pendulums without having to  
-     move the cart to zero position on the rail           )  
+\*only the pendulums are reset for input 'r', however,  
+  it is possible to enable cart position reset with 'r'  
+  by uncommenting // cart.resetPos();  
+  currently the cart is only reset at each new upload,  
+  ( this allows resetting the pendulums without having to  
+    move the cart to zero position on the rail           )  
   
-**the swing-up works and the stabilizing controllers work,  
-  however, on the system in its current state, they do NOT  
-  swing-up AND catch the twin pendulum  
+\*\*the swing-up works and the stabilizing controllers work,  
+    however, on the system in its current state, they do NOT  
+    swing-up AND catch the twin pendulum  
   
 ---------------------------------------------------------------  
