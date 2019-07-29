@@ -8,7 +8,7 @@ In general before upload remember:
 - Check:  
   > Tools - Board - Teensy 3.6 (Programming Port)  
   > Tools - Port - COM# (Teensy 3.6 (Programming Port))  
-  > "Serial.begin(115200)" below with baud on terminal  
+  > "Serial.begin(115200)" agrees with baud on terminal  
 - Move the cart to the right side of the rail
   
 OBS: The cart must be at the right side of the rail @ each upload!  
